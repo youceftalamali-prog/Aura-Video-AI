@@ -1,0 +1,38 @@
+FROM node:20-bookworm-slim AS base
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY packages/types/package.json ./packages/types/
+COPY packages/config/package.json ./packages/config/
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/api/package.json ./apps/api/
+RUN pnpm install --frozen-lockfile
+
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages ./packages
+COPY --from=deps /app/apps/api ./apps/api
+COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages ./packages
+COPY apps/api ./apps/api
+RUN pnpm --filter @aura/types build \
+ && pnpm --filter @aura/config build \
+ && pnpm --filter @aura/shared build \
+ && pnpm --filter @aura/api build
+
+# Production runtime with FFmpeg for composition/export
+FROM node:20-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && ffmpeg -version | head -1
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+EXPOSE 3001
+CMD ["node", "dist/index.js"]

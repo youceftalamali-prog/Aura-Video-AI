@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aura-postgres
+    environment:
+      POSTGRES_USER: aura
+      POSTGRES_PASSWORD: aura_secret
+      POSTGRES_DB: aura_video_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - aura_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aura -d aura_video_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: aura-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - aura_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: aura-api
+    ports:
+      - "3001:3001"
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+      STORAGE_PROVIDER: local
+      LOCAL_STORAGE_PATH: /data/storage
+    volumes:
+      - aura_storage:/data/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  aura_pg_data:
+  aura_redis_data:
+  aura_storage:
+
