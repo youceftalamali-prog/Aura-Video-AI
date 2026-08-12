@@ -23,7 +23,7 @@ const envSchema = z.object({
   ADMIN_URL: z.string().url().default('http://localhost:5174'),
   API_URL: z.string().url().default('http://localhost:3001'),
 
-  CORS_ORIGINS: z.string().default('http://localhost:5173,http://localhost:5174'),
+  CORS_ORIGINS: z.string().default('http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174'),
 
   R2_ACCOUNT_ID: z.string().optional().default(''),
   R2_ACCESS_KEY_ID: z.string().optional().default(''),

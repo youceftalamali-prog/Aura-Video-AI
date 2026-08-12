@@ -19,7 +19,19 @@ export function createApp(): Express {
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(
     cors({
-      origin: env.CORS_ORIGINS.split(',').map((o) => o.trim()),
+      origin: (origin, callback) => {
+        if (!origin) {
+          return callback(null, true);
+        }
+
+        const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
+        const isDevPreviewOrigin = env.NODE_ENV === 'development' && /\.github\.dev$/.test(origin);
+        if (allowedOrigins.includes(origin) || isDevPreviewOrigin) {
+          return callback(null, true);
+        }
+
+        return callback(new Error('Not allowed by CORS'));
+      },
       credentials: true,
     }),
   );

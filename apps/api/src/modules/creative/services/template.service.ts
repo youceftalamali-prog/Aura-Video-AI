@@ -17,7 +17,7 @@ export class TemplateService {
     const rows = await this.db
       .select()
       .from(templates)
-      .where(eq(templates.status, 'active'))
+      .where(eq(templates.status, 'published'))
       .orderBy(asc(templates.sortOrder));
     return rows as unknown as Template[];
   }

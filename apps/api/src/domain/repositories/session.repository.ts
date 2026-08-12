@@ -2,6 +2,7 @@ import { eq, and, isNull, gt } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { sessions } from '../../db/schema.js';
 import type { Session } from '@aura/types';
+import { verifyTokenHash } from '../../infrastructure/auth/password.js';
 
 export class SessionRepository {
   constructor(private readonly db: Database) {}
@@ -54,5 +55,20 @@ export class SessionRepository {
       .update(sessions)
       .set({ revokedAt: new Date() })
       .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+  }
+
+  async findByRefreshToken(token: string): Promise<Session | null> {
+    const now = new Date();
+    const rows = await this.db
+      .select()
+      .from(sessions)
+      .where(and(isNull(sessions.revokedAt), gt(sessions.expiresAt, now)));
+    for (const r of rows) {
+      // refresh token hashes are bcrypt hashes; compare
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await verifyTokenHash(token, String((r as any).refreshTokenHash));
+      if (ok) return r as unknown as Session;
+    }
+    return null;
   }
 }

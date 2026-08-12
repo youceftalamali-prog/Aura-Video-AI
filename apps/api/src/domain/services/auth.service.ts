@@ -149,8 +149,14 @@ export class AuthService {
       throw new AuthenticationError('Invalid session');
     }
 
-    // Rotate: revoke old sessions that match is complex without storing raw token;
-    // for foundation we issue new tokens.
+    // Ensure the refresh token corresponds to a valid session record and is not revoked/expired.
+    const session = await this.sessionRepo.findByRefreshToken(refreshToken);
+    if (!session || session.userId !== user.id) {
+      throw new AuthenticationError('Invalid session');
+    }
+
+    // Revoke the old session and rotate to a new one
+    await this.sessionRepo.revoke(session.id);
     const tokens = await this.createSession(user.id, user.email, user.role, meta);
 
     return {

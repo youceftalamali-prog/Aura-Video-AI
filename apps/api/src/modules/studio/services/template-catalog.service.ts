@@ -125,7 +125,7 @@ export class TemplateCatalogService {
   }
 
   async listDbTemplates(): Promise<Template[]> {
-    const rows = await this.db.select().from(templates).where(eq(templates.status, 'active'));
+    const rows = await this.db.select().from(templates).where(eq(templates.status, 'published'));
     return rows as unknown as Template[];
   }
 

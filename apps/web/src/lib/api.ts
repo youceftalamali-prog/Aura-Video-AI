@@ -29,8 +29,9 @@ export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
+const configuredApiUrl = (import.meta.env.VITE_API_URL ?? '').toString().trim().replace(/\/$/, '');
 export const api = new AuraClient({
-  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  baseUrl: configuredApiUrl || '',
   getAccessToken,
   onUnauthorized: () => {
     clearTokens();
