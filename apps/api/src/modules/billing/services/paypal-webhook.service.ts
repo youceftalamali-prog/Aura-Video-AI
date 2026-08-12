@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, and, or, lte } from 'drizzle-orm';
 import type { Database } from '../../../db/client.js';
 import { subscriptions, paypalWebhookEvents, workspaces } from '../../../db/schema.js';
 import { AppError } from '@aura/shared';
@@ -194,6 +194,9 @@ export class PayPalWebhookService {
       .where(eq(subscriptions.workspaceId, workspaceId))
       .limit(1);
 
+    const sameSubscription = existing[0]?.externalId === subId;
+    const alreadyGranted = Boolean(existing[0]?.periodCreditsGranted);
+
     if (existing[0]) {
       await this.db
         .update(subscriptions)
@@ -201,8 +204,14 @@ export class PayPalWebhookService {
           planId: planUuid,
           status: mapped,
           externalId: subId,
-          currentPeriodStart: now,
-          currentPeriodEnd: periodEnd,
+          // Mid-cycle syncs (same subscription, credits already granted) keep the
+          // billing period; only a fresh subscription or the initial activation
+          // (re)starts the period.
+          currentPeriodStart: sameSubscription && alreadyGranted ? existing[0].currentPeriodStart : now,
+          currentPeriodEnd: sameSubscription && alreadyGranted ? existing[0].currentPeriodEnd : periodEnd,
+          // A different external id means a new billing agreement: reset the
+          // per-period flag so the new initial grant can be claimed.
+          periodCreditsGranted: sameSubscription ? alreadyGranted : false,
           updatedAt: now,
         })
         .where(eq(subscriptions.id, existing[0].id));
@@ -224,10 +233,43 @@ export class PayPalWebhookService {
     if (grantCredits && mapped === 'active') {
       const credits = PLAN_META[planKey]?.includedCredits ?? 0;
       if (credits > 0) {
-        await this.ledger.grant(workspaceId, credits);
-        log('paypal_subscription_credits_granted', { workspaceId, credits, subId, planKey });
+        await this.claimPeriodGrant({ workspaceId, subId, credits, planKey });
       }
     }
+  }
+
+  /**
+   * Idempotent "credits granted for billing period" safeguard.
+   * Claims the period with a conditional UPDATE (period_credits_granted false ->
+   * true) and grants inside the same transaction: exactly one grant per billing
+   * period per subscription, even with duplicate/out-of-order deliveries.
+   */
+  private async claimPeriodGrant(input: {
+    workspaceId: string;
+    subId: string;
+    credits: number;
+    planKey: string;
+  }): Promise<void> {
+    const { workspaceId, subId, credits, planKey } = input;
+    await this.db.transaction(async (tx) => {
+      const claimed = await tx
+        .update(subscriptions)
+        .set({ periodCreditsGranted: true })
+        .where(
+          and(
+            eq(subscriptions.workspaceId, workspaceId),
+            eq(subscriptions.externalId, subId),
+            eq(subscriptions.periodCreditsGranted, false),
+          ),
+        )
+        .returning({ id: subscriptions.id });
+      if (claimed.length === 0) {
+        log('paypal_period_credits_skipped', { workspaceId, subId, reason: 'already_granted' });
+        return;
+      }
+      await new CreditLedgerService(tx).grant(workspaceId, credits);
+      log('paypal_subscription_credits_granted', { workspaceId, credits, subId, planKey });
+    });
   }
 
   private async onSubscriptionPayment(resource: Record<string, unknown>): Promise<void> {
@@ -249,27 +291,46 @@ export class PayPalWebhookService {
       log('paypal_sale_unknown_subscription', { billingAgreementId });
       return;
     }
+    // The first billing cycle is granted by BILLING.SUBSCRIPTION.ACTIVATED; the
+    // initial PAYMENT.SALE.COMPLETED arrives inside that same period and must not
+    // grant again. Renewal sales fall outside the current period and grant below.
+    if (sub.periodCreditsGranted && new Date() < sub.currentPeriodEnd) {
+      log('paypal_sale_cycle_already_granted', { billingAgreementId, workspaceId: sub.workspaceId });
+      return;
+    }
     const planKey =
       (Object.keys(PLAN_IDS) as PlanKey[]).find((k) => PLAN_IDS[k] === sub.planId) || 'starter';
     const credits = PLAN_META[planKey]?.includedCredits ?? 0;
-    if (credits > 0) {
-      await this.ledger.grant(sub.workspaceId, credits);
-      const now = new Date();
-      await this.db
+    if (credits <= 0) return;
+    const now = new Date();
+    await this.db.transaction(async (tx) => {
+      const claimed = await tx
         .update(subscriptions)
         .set({
+          periodCreditsGranted: true,
           currentPeriodStart: now,
           currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
           status: 'active',
           updatedAt: now,
         })
-        .where(eq(subscriptions.id, sub.id));
+        .where(
+          and(
+            eq(subscriptions.id, sub.id),
+            or(eq(subscriptions.periodCreditsGranted, false), lte(subscriptions.currentPeriodEnd, now)),
+          ),
+        )
+        .returning({ id: subscriptions.id });
+      if (claimed.length === 0) {
+        log('paypal_sale_cycle_already_granted', { billingAgreementId, workspaceId: sub.workspaceId });
+        return;
+      }
+      await new CreditLedgerService(tx).grant(sub.workspaceId, credits);
       log('paypal_subscription_renewal_credits', {
         workspaceId: sub.workspaceId,
         credits,
         billingAgreementId,
       });
-    }
+    });
   }
 
   private async onSubscriptionCancelled(resource: Record<string, unknown>): Promise<void> {

@@ -218,6 +218,7 @@ export const subscriptions = pgTable(
     interval: varchar('interval', { length: 10 }).notNull().default('month'),
     currentPeriodStart: timestamp('current_period_start', { withTimezone: true }).notNull(),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
+    periodCreditsGranted: boolean('period_credits_granted').notNull().default(false),
     cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
     canceledAt: timestamp('canceled_at', { withTimezone: true }),
     trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),

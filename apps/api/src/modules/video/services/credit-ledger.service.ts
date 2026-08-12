@@ -5,7 +5,7 @@ import { AppError } from '@aura/shared';
 import type { VideoCostEstimate, VideoGenerationMode } from '@aura/types';
 
 export class CreditLedgerService {
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Pick<Database, 'execute' | 'select'>) {}
 
   estimateCost(input: {
     duration: number;
