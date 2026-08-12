@@ -60,6 +60,15 @@ export class UserRepository {
       .where(eq(users.id, id));
   }
 
+  async updateGoogleId(userId: string, googleId: string): Promise<User | null> {
+    const rows = await this.db
+      .update(users)
+      .set({ googleId, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return (rows[0] as unknown as User | undefined) ?? null;
+  }
+
   toPublic(user: User): PublicUser {
     return {
       id: user.id,

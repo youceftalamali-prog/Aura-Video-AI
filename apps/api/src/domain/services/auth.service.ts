@@ -99,14 +99,13 @@ export class AuthService {
     if (!user) {
       const existingByEmail = await this.userRepo.findByEmail(profile.email);
       if (existingByEmail) {
-        user = await this.userRepo.update(existingByEmail.id, {
-          // link google
-        });
-        // update googleId separately if needed - for simplicity create new or update
-        user = await this.userRepo.findById(existingByEmail.id);
-        if (user && !user.googleId) {
-          // In real code we'd have an updateGoogleId method
+        // Account policy: a verified Google subject may only be linked to an
+        // account whose email matches the profile AND that is not already
+        // claimed by a different Google identity. Accounts are never merged.
+        if (existingByEmail.googleId && existingByEmail.googleId !== profile.id) {
+          throw new AuthenticationError('This email is linked to a different Google account');
         }
+        user = await this.userRepo.updateGoogleId(existingByEmail.id, profile.id);
       }
     }
 
