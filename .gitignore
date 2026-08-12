@@ -48,6 +48,7 @@ docker-compose.override.yml
 *.db
 *.sqlite
 
-# Uploads / local storage
+# Uploads / local storage (runtime data — never committed)
 uploads
-storage
+/storage/
+apps/api/storage/
