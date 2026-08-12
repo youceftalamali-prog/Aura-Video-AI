@@ -8,7 +8,7 @@ export function LanguageSelector({ className = '' }: { className?: string }) {
   return (
     <label className={`inline-flex items-center gap-2 text-sm ${className}`}>
       <select
-        className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-slate-800"
+        className="rounded-xl border border-white/10 bg-white/[0.05] px-2.5 py-1.5 text-sm text-violet-100 outline-none transition focus:border-fuchsia-400/50"
         value={language}
         onChange={(e) => setLanguage(e.target.value as LanguageCode)}
         aria-label={t('common.language')}

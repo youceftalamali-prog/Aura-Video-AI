@@ -1,3 +1,94 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #0b0714;
+  background-image:
+    radial-gradient(1100px 520px at 15% -10%, rgba(139, 92, 246, 0.22), transparent 60%),
+    radial-gradient(900px 480px at 100% 0%, rgba(217, 70, 239, 0.14), transparent 55%),
+    radial-gradient(1200px 700px at 50% 120%, rgba(124, 97, 219, 0.12), transparent 60%);
+  background-attachment: fixed;
+  color: #ece9f8;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.35);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.55);
+}
+
+::selection {
+  background: rgba(168, 85, 247, 0.45);
+  color: #fff;
+}
+
+@layer components {
+  .aura-panel {
+    @apply rounded-2xl border border-white/10 bg-white/[0.04] shadow-[0_0_44px_rgba(147,87,246,0.08)];
+  }
+
+  .aura-panel-strong {
+    @apply rounded-2xl border border-white/10 bg-[#151023]/80 shadow-[0_0_60px_rgba(147,87,246,0.14)];
+  }
+
+  .aura-gradient-text {
+    @apply bg-gradient-to-r from-fuchsia-400 via-purple-400 to-violet-300 bg-clip-text text-transparent;
+  }
+
+  .aura-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-fuchsia-900/40 transition hover:from-fuchsia-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .aura-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-medium text-violet-100 transition hover:border-fuchsia-400/40 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .aura-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-violet-100 transition hover:border-fuchsia-400/50 hover:bg-white/[0.08];
+  }
+
+  .aura-input {
+    @apply w-full rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-2.5 text-sm text-white placeholder-violet-300/50 outline-none transition focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-500/20;
+  }
+
+  .aura-label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-violet-300/70;
+  }
+
+  .aura-phone {
+    @apply relative overflow-hidden rounded-[1.4rem] border border-white/15 bg-black shadow-[0_20px_50px_-12px_rgba(0,0,0,0.8)];
+  }
+
+  .aura-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold;
+  }
+}

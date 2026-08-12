@@ -15,287 +15,316 @@ export const TEMPLATE_CATEGORIES: Omit<LibraryTemplateCategory, 'templateCount'>
   { slug: 'real-estate', name: 'Real Estate', description: 'Property showcase and listing ads.', previewGradient: 'from-sky-700 via-blue-600 to-indigo-800', sortOrder: 12 },
 ];
 
-function scenes(defs: Array<[string, string, number, string]>): LibraryTemplateSceneDefinition[] {
-  return defs.map(([type, title, durationSeconds, visualPromptTemplate], i) => ({
-    order: i + 1,
-    type,
-    title,
-    durationSeconds,
-    visualPromptTemplate,
-    productPlacement: type === 'product' || type === 'closeup' ? 'center' : undefined,
-    textPlaceholder: type === 'cta' ? 'Shop now' : type === 'hook' ? 'Discover' : undefined,
-    transition: 'fade',
-  }));
+const ASPECT_RATIOS = ['9:16', '9:16', '9:16', '1:1', '16:9'];
+
+type SceneType = 'hook' | 'product' | 'closeup' | 'lifestyle' | 'cta';
+
+const SCENE_TITLES: Record<SceneType, string> = {
+  hook: 'Hook',
+  product: 'Showcase',
+  closeup: 'Detail',
+  lifestyle: 'Lifestyle',
+  cta: 'CTA',
+};
+
+const SCENE_PATTERNS: Array<{ name: string; scenes: Array<{ type: SceneType; duration: number }> }> = [
+  { name: 'Classic', scenes: [hook(2.5), product(4), lifestyle(4), cta(3.5)] },
+  { name: 'Detail', scenes: [hook(3), closeup(4), product(4), cta(3)] },
+  { name: 'Full Story', scenes: [hook(2.5), closeup(3.5), lifestyle(4), product(3), cta(2.5)] },
+  { name: 'Quick', scenes: [product(4), closeup(4), cta(3)] },
+  { name: 'Direct', scenes: [hook(3), product(5), cta(4)] },
+  { name: 'Story', scenes: [hook(3), lifestyle(5), cta(3), product(4)] },
+];
+
+function hook(duration: number) { return { type: 'hook' as const, duration }; }
+function product(duration: number) { return { type: 'product' as const, duration }; }
+function closeup(duration: number) { return { type: 'closeup' as const, duration }; }
+function lifestyle(duration: number) { return { type: 'lifestyle' as const, duration }; }
+function cta(duration: number) { return { type: 'cta' as const, duration }; }
+
+interface CategoryRecipe {
+  catName: string;
+  stems: string[];
+  flavors: string[];
+  setting: string;
+  detail: string;
+  lifestyleLine: string;
+  supported: string[];
+  tags: string[];
+  subCategories?: string[];
 }
 
-type Seed = {
+const CATEGORY_RECIPES: Record<string, CategoryRecipe> = {
+  jewelry: {
+    catName: 'Jewelry',
+    stems: [
+      'Luxury Jewelry Showcase', 'Gold Necklace Spotlight', 'Diamond Ring Moment', 'Elegant Jewelry Close-Up',
+      'Pearl Elegance', 'Rose Gold Glow', 'Statement Piece Reveal', 'Bridal Collection', 'Timeless Classic',
+      'Vintage Charm', 'High-End Hero', 'Solitaire Story', 'Charm Bracelet Tales', 'Night Out Luxe', 'Fine Craft Detail',
+      'Modern Minimal Gold', 'Signature Sparkle', 'Everyday Elegance', 'Bold and Bright', 'Soft Romance', 'Royal Radiance',
+      'Twinkle Tales', 'Lux Express', 'Aura Signature Jewelry',
+    ],
+    flavors: ['luxury', 'elegant', 'premium', 'romantic'],
+    setting: 'elegant dark studio, soft golden spotlight, cinematic shallow depth of field',
+    detail: 'macro craftsmanship, metal reflections and sparkling facets, precision focus',
+    lifestyleLine: 'a refined fashion moment with jewelry worn elegantly',
+    supported: ['rings', 'necklaces', 'bracelets', 'earrings', 'jewelry'],
+    tags: ['luxury', 'gold', 'premium', 'sparkle'],
+    subCategories: ['luxury', 'rings', 'necklaces', 'bracelets', 'earrings'],
+  },
+  fashion: {
+    catName: 'Fashion',
+    stems: [
+      'Fashion Product Showcase', 'Minimal Fashion Ad', 'Premium Clothing Reveal', 'Street Style Drop', 'Luxury Apparel Story',
+      'Boho Chic Moments', 'Tailored Elegance', 'Urban Edge', 'Runway Moment', 'Classic Wardrobe', 'Denim Days',
+      'Silk and Satin', 'Monochrome Style', 'Bold Pattern Play', 'Everyday Basics', 'Evening Glam', 'Athleisure Cool',
+      'Heritage Craft', 'Trend Spotlight', 'Capsule Collection', 'Summer Breeze Look', 'Winter Layers', 'Signature Fit',
+      'Parisian Chic',
+    ],
+    flavors: ['editorial', 'modern', 'minimal', 'premium'],
+    setting: 'minimal studio backdrop, soft diffused light, fashion editorial look',
+    detail: 'macro fabric texture, stitching and tailoring finish, tactile feel',
+    lifestyleLine: 'a stylish everyday scene with the item styled naturally',
+    supported: ['clothing', 'apparel', 'fashion', 'accessories'],
+    tags: ['fashion', 'lookbook', 'style', 'premium'],
+    subCategories: ['women', 'men', 'casual', 'luxury'],
+  },
+  sportswear: {
+    catName: 'Sportswear',
+    stems: [
+      'Fitness Product Ad', 'Athletic Product Showcase', 'Dynamic Sportswear', 'Running Performance', 'Gym Motivation',
+      'High-Energy Training', 'Sportswear Essentials', 'Marathon Focus', 'Yoga and Flow', 'Team Spirit', 'Strength Series',
+      'Speed Demon', 'No Limits', 'Recovery Mode', 'Core Power', 'Fresh Start Routine', 'Outdoor Explorer',
+      'Sport Performance', 'Bootcamp Energy', 'Race Day', 'Sweat and Shine', 'Pro Athlete', 'Endurance Test',
+      'Game Changer Sportswear',
+    ],
+    flavors: ['energetic', 'athletic', 'inspirational', 'dynamic'],
+    setting: 'high-energy gym or outdoor athletic environment, dynamic lighting',
+    detail: 'macro fabric weave, breathable mesh and performance detail, sweat-grade material',
+    lifestyleLine: 'a training or workout moment in motion',
+    supported: ['sportswear', 'fitness', 'running', 'athletic'],
+    tags: ['fitness', 'energy', 'performance'],
+    subCategories: ['fitness', 'running', 'gym', 'yoga'],
+  },
+  shoes: {
+    catName: 'Shoes',
+    stems: [
+      'Sneaker Showcase', 'Premium Shoe Reveal', 'Street Heat', 'Sole Story', 'Running Starter', 'Classic Kicks',
+      'Lux Leather', 'Casual Comfort', 'Bold Traction', 'Court Classic', 'Trail Blazer', 'Evening Heels',
+      'Everyday Walk', 'High-Top Hero', 'Slip-On Ease', 'Sport Sprint', 'Statement Lace', 'Minimal White',
+      'Retro Throwback', 'Urban Sneaker', 'Lightweight Lover', 'Her Sole Rising', 'First Step', 'Fast Lane',
+    ],
+    flavors: ['streetwear', 'premium', 'clean', 'bold'],
+    setting: 'studio or urban backdrop with dramatic side lighting, product-first framing',
+    detail: 'macro sole, stitching and material detail, wear-and-tear appeal',
+    lifestyleLine: 'a confident on-the-move scene during everyday wear',
+    supported: ['sneakers', 'shoes', 'footwear'],
+    tags: ['sneakers', 'street', 'comfort'],
+    subCategories: ['sneakers', 'luxury', 'casual', 'sports'],
+  },
+  beauty: {
+    catName: 'Beauty',
+    stems: [
+      'Cosmetic Product Showcase', 'Luxury Beauty Ad', 'Perfume Showcase', 'Skincare Ritual', 'Makeup Masterclass',
+      'Glow Essentials', 'Flawless Finish', 'Scent of Elegance', 'Nail Polish Pop', 'Fresh Face', 'Evening Makeup',
+      'Serum Secrets', 'Hydration Hero', 'Bright Eyes', 'Velvet Lips', 'Daily Glow', 'Spa Retreat', 'Anti-Aging Care',
+      'Clean Beauty', 'Blush and Bloom', 'Radiance Boost', 'Smoky Eyes', 'Beauty Bare', 'Signature Scent',
+    ],
+    flavors: ['glowing', 'fresh', 'luxury', 'soft'],
+    setting: 'bright soft beauty lighting, clean cosmetics ambiance, pampering mood',
+    detail: 'macro texture of the formula, elegant packaging, radiant highlights',
+    lifestyleLine: 'a daily beauty or spa ritual moment',
+    supported: ['cosmetics', 'skincare', 'makeup', 'perfume'],
+    tags: ['beauty', 'skincare', 'glow'],
+    subCategories: ['cosmetics', 'skincare', 'makeup', 'perfume'],
+  },
+  watches: {
+    catName: 'Watches',
+    stems: [
+      'Luxury Watch Showcase', 'Premium Watch Reveal', 'Chronograph Focus', 'Smart Watch Life', 'Classic Timepiece',
+      'Athleisure Watch', 'Heritage Craft', 'Midnight Dial', 'Rose Gold Time', 'Business Class', 'Sport Chrono',
+      'Minimal Modern', 'Automatic Movement', 'Diver Watch', 'Slim Elegance', 'Weekend Classic', 'Aviation Pilot',
+      'Precision Perfection', 'Rotating Bezel', 'Moon and Stars', 'Chrono Life', 'Gentle Gold', 'Daily Driver',
+      'Statement Time',
+    ],
+    flavors: ['precision', 'luxury', 'modern', 'classic'],
+    setting: 'dramatic close-up studio with shallow focus and reflective metal accents',
+    detail: 'macro dial, hands and movement detail, engineered precision',
+    lifestyleLine: 'a refined lifestyle scene on the wrist in everyday situations',
+    supported: ['watches', 'smartwatches'],
+    tags: ['luxury', 'watch', 'precision'],
+    subCategories: ['luxury', 'smart', 'classic', 'sport'],
+  },
+  bags: {
+    catName: 'Bags & Accessories',
+    stems: [
+      'Handbag Showcase', 'Leather Backpack Story', 'Everyday Tote', 'Crossbody Chic', 'Luxury Satchel',
+      'Minimal Clutch', 'Weekend Duffel', 'Office Essential', 'Street Style Carry', 'Travel Companion', 'Evening Bag',
+      'Canvas Utility', 'Quilted Classic', 'Belt Bag Buzz', 'Structured Tote', 'Soft Leather', 'Festival Flare',
+      'City Explorer', 'Pocket Perfect', 'Royal Revival', 'Eco Canvas', 'Slim Wallet Set', 'Golden Hour Carry',
+      'Signature Carry',
+    ],
+    flavors: ['functional', 'luxury', 'minimal', 'versatile'],
+    setting: 'clean studio scenes and city lifestyle backdrops, balanced natural light',
+    detail: 'macro stitching, leather texture and hardware detail',
+    lifestyleLine: 'a stylish carry moment during a daily commute or travel',
+    supported: ['handbags', 'backpacks', 'totes', 'accessories'],
+    tags: ['bags', 'leather', 'travel'],
+    subCategories: ['handbags', 'backpacks', 'totes', 'accessories'],
+  },
+  electronics: {
+    catName: 'Electronics',
+    stems: [
+      'Gadget Reveal', 'Smart Home Hero', 'Premium Tech Unboxing', 'Wireless Freedom', 'Power and Speed',
+      'Design Forward', 'Everyday Tech', 'Gaming Setup', 'Home Office Pro', 'Audio Immersion', 'Visual Spectacle',
+      'Battery Life', 'Ultra Slim', 'Smart Living', 'Future Ready', 'Connectivity Boost', 'Folding Forward',
+      'Travel Tech', 'Privacy Shield', 'Creator Kit', 'Neon Nights', 'Classic Tech', 'Budget Brilliance',
+      'Ultimate Upgrade',
+    ],
+    flavors: ['futuristic', 'premium', 'clean', 'dynamic'],
+    setting: 'sleek product studio with blue accent lighting, modern tech aesthetic',
+    detail: 'macro ports, texture and display detail, engineered design',
+    lifestyleLine: 'a modern smart-living scene using the device',
+    supported: ['electronics', 'gadgets', 'devices', 'tech'],
+    tags: ['tech', 'gadgets', 'modern'],
+    subCategories: ['gadgets', 'audio', 'gaming', 'home'],
+  },
+  food: {
+    catName: 'Food & Beverage',
+    stems: [
+      'Gourmet Food Spotlight', 'Fresh Flavor Burst', 'Artisan Kitchen', 'Beverage Ice Pop', 'Home Cooking Joy',
+      'Spice and Sizzle', 'Breakfast Bliss', 'Cozy Brunch', 'Good Mood Meals', 'Organic Harvest', 'Quick and Easy',
+      'Family Feast', 'Party Bites', 'Dessert Dreams', 'Healthy Bowl', 'Coffee Ritual', 'Smoothie Boost',
+      'Snack Attack', 'BBQ Summer', 'Winter Warmers', 'Local Farm', 'Sweet Sunday', 'Umami Works', 'First Bite',
+    ],
+    flavors: ['appetizing', 'fresh', 'warm', 'vibrant'],
+    setting: 'bright kitchen or dining scene, natural light, mouthwatering plating',
+    detail: 'macro textures, steam, drips and ingredients, food-porn close-up',
+    lifestyleLine: 'a joyful sharing and eating moment with family or friends',
+    supported: ['food', 'beverages', 'snacks', 'gourmet'],
+    tags: ['food', 'appetizing', 'fresh'],
+    subCategories: ['gourmet', 'beverage', 'snacks', 'meals'],
+  },
+  home: {
+    catName: 'Home & Furniture',
+    stems: [
+      'Home and Furniture Spotlight', 'Cozy Living Room', 'Modern Minimal Home', 'Functional Kitchen', 'Bedroom Serenity',
+      'Workspace Elegance', 'Outdoor Living', 'Smart Home Upgrade', 'DIY Home Project', 'Vintage Revival',
+      'Scandinavian Style', 'Greenery Haven', 'Family Room Comfort', 'Luxe Living', 'Space Saver', 'Textile Texture',
+      'Light and Airy', 'Rustic Charm', 'Home Office Focus', 'Entertainer Kitchen', 'Cozy Corner', 'Artful Details',
+      'Sleep Sanctuary', 'Open Concept',
+    ],
+    flavors: ['warm', 'minimal', 'coastal', 'urban'],
+    setting: 'stylized interior scenes, soft natural window light, homely atmosphere',
+    detail: 'macro texture of materials, wood grain and soft textiles, inviting craft',
+    lifestyleLine: 'a comfortable everyday home scene, warm and lived in',
+    supported: ['furniture', 'home decor', 'kitchen', 'interiors'],
+    tags: ['home', 'furniture', 'cozy'],
+    subCategories: ['furniture', 'decor', 'kitchen', 'bedroom'],
+  },
+  automotive: {
+    catName: 'Automotive',
+    stems: [
+      'Car Care Reveal', 'Auto Accessory Showcase', 'Interior Detail', 'Performance Upgrade', 'Weekend Detail',
+      'Road Trip Ready', 'Engine Excellence', 'Wheel and Tire Glow', 'Tech Cockpit', 'Headlight Hero',
+      'Interior Luxury', 'GPS Navigation', 'Safety First', 'Off-Road Ready', 'Showroom Shine', 'Custom Build',
+      'Sound System', 'Winter Ready', 'Aero Style', 'Fast and Furious Lite', 'Family SUV Ready', 'Auto Detailing Pro',
+      'Spark Plug Spark', 'Clean Machine',
+    ],
+    flavors: ['sleek', 'powerful', 'premium', 'practical'],
+    setting: 'studio or garage scenes with dramatic rim lighting, automotive gloss',
+    detail: 'macro brushed metal, stitching and detailing, showroom finish',
+    lifestyleLine: 'a road-ready lifestyle moment with the vehicle accessory',
+    supported: ['car accessories', 'auto parts', 'automotive'],
+    tags: ['automotive', 'car', 'performance'],
+    subCategories: ['car-care', 'accessories', 'interior', 'performance'],
+  },
+  'real-estate': {
+    catName: 'Real Estate',
+    stems: [
+      'Property Showcase', 'Lux Home Tour', 'Modern Apartment', 'Cozy Starter Home', 'Dream Villa', 'City View Live',
+      'Suburban Oasis', 'Renovated Gem', 'New Build Reveal', 'Garden Retreat', 'Penthouse Living', 'Loft Conversion',
+      'Townhouse Charm', 'Investment Pick', 'First-Time Buyer', 'Family Home Tour', 'Near Transit', 'Waterfront View',
+      'Smart Home Tour', 'Rental Ready', 'Elegant Entrance', 'Sunlit Spaces', 'Neighborhood Guide', 'Closing Day',
+    ],
+    flavors: ['bright', 'premium', 'spacious', 'inviting'],
+    setting: 'airy interior walkthroughs with abundant natural light, architectural beauty',
+    detail: 'macro design details, moldings, finishes and fixtures, quality craft',
+    lifestyleLine: 'a lifestyle moment showing the property as home',
+    supported: ['property', 'apartments', 'villas', 'real estate'],
+    tags: ['real-estate', 'property', 'home'],
+    subCategories: ['property', 'apartment', 'villa', 'investment'],
+  },
+};
+
+export type Seed = {
   slug: string;
   name: string;
   description: string;
   category: string;
   subCategory?: string;
   durationSeconds: number;
+  aspectRatio: string;
   tags: string[];
   supportedProductTypes: string[];
   isFeatured?: boolean;
   scenes: LibraryTemplateSceneDefinition[];
 };
 
-export const TEMPLATE_SEEDS: Seed[] = [
-  {
-    slug: 'luxury-jewelry-showcase',
-    name: 'Luxury Jewelry Showcase',
-    description: 'Premium gold jewelry on dark elegant backgrounds with soft light.',
-    category: 'jewelry',
-    subCategory: 'luxury',
-    durationSeconds: 15,
-    tags: ['luxury', 'gold', 'premium'],
-    supportedProductTypes: ['rings', 'necklaces', 'bracelets', 'earrings'],
-    isFeatured: true,
-    scenes: scenes([
-      ['hook', 'Opening', 3, 'Elegant dark background, soft spotlight, {{product}} jewelry product intro, cinematic'],
-      ['closeup', 'Close-up', 4, 'Macro close-up of {{product}}, reflective metal, luxury lighting'],
-      ['lifestyle', 'Lifestyle', 4, 'Lifestyle scene featuring {{product}} worn elegantly, shallow depth of field'],
-      ['cta', 'CTA', 4, 'Clean ending frame with {{product}}, soft glow, call to action space'],
-    ]),
-  },
-  {
-    slug: 'premium-product-reveal',
-    name: 'Premium Product Reveal',
-    description: 'Dramatic reveal for high-end jewelry pieces.',
-    category: 'jewelry',
-    durationSeconds: 12,
-    tags: ['reveal', 'premium'],
-    supportedProductTypes: ['rings', 'necklaces'],
-    scenes: scenes([
-      ['hook', 'Reveal', 4, 'Dark velvet, {{product}} slowly revealed under warm light'],
-      ['product', 'Showcase', 5, '{{product}} centered, rotating showcase, premium studio'],
-      ['cta', 'CTA', 3, 'Final hero shot of {{product}} with brand space'],
-    ]),
-  },
-  {
-    slug: 'elegant-jewelry-close-up',
-    name: 'Elegant Jewelry Close-Up',
-    description: 'Detail-focused close-ups for craftsmanship.',
-    category: 'jewelry',
-    durationSeconds: 10,
-    tags: ['closeup', 'detail'],
-    supportedProductTypes: ['rings', 'earrings', 'bracelets'],
-    scenes: scenes([
-      ['closeup', 'Detail', 5, 'Extreme close-up craftsmanship of {{product}}'],
-      ['product', 'Hero', 3, 'Hero product shot {{product}}'],
-      ['cta', 'CTA', 2, 'Simple CTA with {{product}}'],
-    ]),
-  },
-  {
-    slug: 'luxury-ring-ad',
-    name: 'Luxury Ring Ad',
-    description: 'Optimized for ring products and proposals.',
-    category: 'jewelry',
-    subCategory: 'rings',
-    durationSeconds: 15,
-    tags: ['ring', 'proposal'],
-    supportedProductTypes: ['rings'],
-    isFeatured: true,
-    scenes: scenes([
-      ['hook', 'Sparkle', 3, 'Sparkle light rays, {{product}} ring'],
-      ['closeup', 'Detail', 5, 'Diamond facets close-up of {{product}}'],
-      ['lifestyle', 'Moment', 4, 'Romantic soft-focus moment featuring {{product}}'],
-      ['cta', 'CTA', 3, 'CTA frame {{product}}'],
-    ]),
-  },
-  {
-    slug: 'fashion-product-showcase',
-    name: 'Fashion Product Showcase',
-    description: 'Clean fashion lookbook style for apparel.',
-    category: 'fashion',
-    durationSeconds: 15,
-    tags: ['fashion', 'lookbook'],
-    supportedProductTypes: ['clothing', 'apparel'],
-    isFeatured: true,
-    scenes: scenes([
-      ['hook', 'Style', 3, 'Minimal studio, {{product}} fashion item'],
-      ['product', 'Fit', 5, '{{product}} product detail and fabric texture'],
-      ['lifestyle', 'Wear', 4, 'Lifestyle model wearing {{product}}'],
-      ['cta', 'CTA', 3, 'CTA with {{product}}'],
-    ]),
-  },
-  {
-    slug: 'minimal-fashion-ad',
-    name: 'Minimal Fashion Ad',
-    description: 'Minimalist white/beige aesthetic for modern brands.',
-    category: 'fashion',
-    durationSeconds: 12,
-    tags: ['minimal'],
-    supportedProductTypes: ['clothing'],
-    scenes: scenes([
-      ['hook', 'Minimal', 4, 'Beige minimal backdrop, {{product}}'],
-      ['product', 'Focus', 5, 'Centered {{product}} soft shadows'],
-      ['cta', 'CTA', 3, 'Minimal CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'premium-clothing-reveal',
-    name: 'Premium Clothing Reveal',
-    description: 'Dramatic fabric and silhouette reveal.',
-    category: 'fashion',
-    durationSeconds: 14,
-    tags: ['premium', 'reveal'],
-    supportedProductTypes: ['clothing', 'luxury fashion'],
-    scenes: scenes([
-      ['hook', 'Reveal', 4, 'Silhouette reveal of {{product}}'],
-      ['product', 'Fabric', 6, 'Fabric texture detail {{product}}'],
-      ['cta', 'CTA', 4, 'Hero CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'fitness-product-ad',
-    name: 'Fitness Product Ad',
-    description: 'High-energy fitness product ads.',
-    category: 'sportswear',
-    durationSeconds: 15,
-    tags: ['fitness', 'energy'],
-    supportedProductTypes: ['sportswear', 'fitness'],
-    isFeatured: true,
-    scenes: scenes([
-      ['hook', 'Energy', 3, 'Dynamic motion, gym energy, {{product}}'],
-      ['product', 'Gear', 5, '{{product}} athletic product showcase'],
-      ['lifestyle', 'Train', 4, 'Athlete training with {{product}}'],
-      ['cta', 'CTA', 3, 'Bold CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'athletic-product-showcase',
-    name: 'Athletic Product Showcase',
-    description: 'Performance-focused athletic showcase.',
-    category: 'sportswear',
-    durationSeconds: 12,
-    tags: ['athletic'],
-    supportedProductTypes: ['sportswear'],
-    scenes: scenes([
-      ['hook', 'Start', 3, 'Action start {{product}}'],
-      ['product', 'Detail', 5, 'Product detail {{product}}'],
-      ['cta', 'CTA', 4, 'CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'dynamic-sportswear',
-    name: 'Dynamic Sportswear',
-    description: 'Fast cuts and motion for sportswear.',
-    category: 'sportswear',
-    durationSeconds: 12,
-    tags: ['dynamic'],
-    supportedProductTypes: ['sportswear', 'running'],
-    scenes: scenes([
-      ['hook', 'Motion', 4, 'Fast motion blur {{product}}'],
-      ['lifestyle', 'Run', 5, 'Running lifestyle {{product}}'],
-      ['cta', 'CTA', 3, 'CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'sneaker-showcase',
-    name: 'Sneaker Showcase',
-    description: 'Street-style sneaker hero shots.',
-    category: 'shoes',
-    durationSeconds: 12,
-    tags: ['sneakers'],
-    supportedProductTypes: ['sneakers', 'shoes'],
-    isFeatured: true,
-    scenes: scenes([
-      ['hook', 'Drop', 3, 'Sneaker drop style {{product}}'],
-      ['closeup', 'Detail', 5, 'Sole and material detail {{product}}'],
-      ['cta', 'CTA', 4, 'CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'premium-shoe-reveal',
-    name: 'Premium Shoe Reveal',
-    description: 'Luxury footwear reveal.',
-    category: 'shoes',
-    durationSeconds: 12,
-    tags: ['premium', 'shoes'],
-    supportedProductTypes: ['shoes', 'luxury shoes'],
-    scenes: scenes([
-      ['hook', 'Reveal', 4, 'Luxury shoe reveal {{product}}'],
-      ['product', 'Hero', 5, 'Hero product {{product}}'],
-      ['cta', 'CTA', 3, 'CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'cosmetic-product-showcase',
-    name: 'Cosmetic Product Showcase',
-    description: 'Clean beauty packaging showcase.',
-    category: 'beauty',
-    durationSeconds: 12,
-    tags: ['cosmetics'],
-    supportedProductTypes: ['cosmetics', 'skincare'],
-    isFeatured: true,
-    scenes: scenes([
-      ['hook', 'Glow', 3, 'Soft glow beauty light {{product}}'],
-      ['product', 'Pack', 5, 'Packaging hero {{product}}'],
-      ['cta', 'CTA', 4, 'CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'luxury-beauty-ad',
-    name: 'Luxury Beauty Ad',
-    description: 'Premium beauty brand aesthetic.',
-    category: 'beauty',
-    durationSeconds: 15,
-    tags: ['luxury', 'beauty'],
-    supportedProductTypes: ['makeup', 'skincare'],
-    scenes: scenes([
-      ['hook', 'Luxe', 4, 'Luxury vanity {{product}}'],
-      ['lifestyle', 'Apply', 6, 'Beauty lifestyle {{product}}'],
-      ['cta', 'CTA', 5, 'CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'perfume-showcase',
-    name: 'Perfume Showcase',
-    description: 'Scent-inspired visual storytelling for fragrance.',
-    category: 'beauty',
-    subCategory: 'perfume',
-    durationSeconds: 12,
-    tags: ['perfume'],
-    supportedProductTypes: ['perfume', 'fragrance'],
-    scenes: scenes([
-      ['hook', 'Mist', 4, 'Ethereal mist around {{product}} bottle'],
-      ['product', 'Bottle', 5, 'Glass bottle hero {{product}}'],
-      ['cta', 'CTA', 3, 'CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'luxury-watch-showcase',
-    name: 'Luxury Watch Showcase',
-    description: 'Precision and craftsmanship for watches.',
-    category: 'watches',
-    durationSeconds: 15,
-    tags: ['luxury', 'watch'],
-    supportedProductTypes: ['watches'],
-    isFeatured: true,
-    scenes: scenes([
-      ['hook', 'Tick', 3, 'Macro watch face {{product}}'],
-      ['closeup', 'Craft', 5, 'Craftsmanship details {{product}}'],
-      ['lifestyle', 'Wrist', 4, 'On-wrist lifestyle {{product}}'],
-      ['cta', 'CTA', 3, 'CTA {{product}}'],
-    ]),
-  },
-  {
-    slug: 'premium-watch-reveal',
-    name: 'Premium Watch Reveal',
-    description: 'Bold reveal for watch launches.',
-    category: 'watches',
-    durationSeconds: 12,
-    tags: ['reveal'],
-    supportedProductTypes: ['watches', 'smart watches'],
-    scenes: scenes([
-      ['hook', 'Reveal', 4, 'Dramatic reveal {{product}}'],
-      ['product', 'Hero', 5, 'Hero product {{product}}'],
-      ['cta', 'CTA', 3, 'CTA {{product}}'],
-    ]),
-  },
-];
+function buildVisualPrompt(type: SceneType, flavor: string, category: CategoryRecipe): string {
+  const productToken = '{{product}}';
+  const flavorWord = flavor ? `, ${flavor} mood` : '';
+  switch (type) {
+    case 'hook':
+      return `Cinematic opening intro of ${productToken}${flavorWord}, ${category.setting}, attention-grabbing first frame`;
+    case 'product':
+      return `Hero product shot of ${productToken}, centered${flavorWord}, ${category.setting}, premium commercial lighting`;
+    case 'closeup':
+      return `Macro detail shot of ${productToken}, ${category.detail}${flavorWord}`;
+    case 'lifestyle':
+      return `Lifestyle scene, ${category.lifestyleLine}${flavorWord}, ${category.setting}`;
+    case 'cta':
+      return `CTA frame, ${productToken} hero shot with brand logo area and call-to-action space, ${category.setting}, ${category.catName} style`;
+  }
+}
+
+export const TEMPLATE_SEEDS: Seed[] = (() => {
+  const seeds: Seed[] = [];
+  for (const [slug, recipe] of Object.entries(CATEGORY_RECIPES)) {
+    recipe.stems.forEach((name, i) => {
+      const pattern = SCENE_PATTERNS[i % SCENE_PATTERNS.length]!;
+      const flavor = recipe.flavors[i % recipe.flavors.length]!;
+      const aspectRatio = ASPECT_RATIOS[i % ASPECT_RATIOS.length]!;
+      const slugified = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const scenes: LibraryTemplateSceneDefinition[] = pattern.scenes.map((s, idx) => ({
+        order: idx + 1,
+        type: s.type,
+        title: SCENE_TITLES[s.type],
+        durationSeconds: s.duration,
+        visualPromptTemplate: buildVisualPrompt(s.type, flavor, recipe),
+        productPlacement: s.type === 'product' || s.type === 'closeup' ? 'center' : undefined,
+        textPlaceholder: s.type === 'cta' ? 'Shop now' : s.type === 'hook' ? 'Discover' : undefined,
+        transition: 'fade',
+      }));
+      const subCategory = recipe.subCategories ? recipe.subCategories[i % recipe.subCategories.length] : undefined;
+      const durationSeconds = Math.round(scenes.reduce((a, s) => a + s.durationSeconds, 0));
+      seeds.push({
+        slug: slugified,
+        name,
+        description: `${name}: professional ${recipe.catName} advertising template in ${aspectRatio} format, optimized for short-form product ads.`,
+        category: slug,
+        subCategory,
+        durationSeconds,
+        aspectRatio,
+        tags: [...recipe.tags, flavor, pattern.name.toLowerCase()],
+        supportedProductTypes: recipe.supported,
+        isFeatured: i < 4 ? true : undefined,
+        scenes,
+      });
+    });
+  }
+  return seeds;
+})();
 
 export function categorySlugList(): string[] {
   return TEMPLATE_CATEGORIES.map((c) => c.slug);

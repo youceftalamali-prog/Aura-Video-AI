@@ -253,7 +253,10 @@
     "ctaColon": "CTA:",
     "readyMade": "Ready-made templates",
     "chooseCategory": "Choose a category designed for your product.",
-    "categoryDesc": "Product-aware advertising templates for this category."
+    "categoryDesc": "Product-aware advertising templates for this category.",
+    "browseAll": "Browse all templates",
+    "openCategory": "Open category",
+    "premium": "Premium"
   },
   "library": {
     "title": "Library",
@@ -359,6 +362,17 @@
     "noJobs": "No jobs yet.",
     "viewPost": "View post",
     "retry": "Retry"
+  },
+  "home": {
+    "newAd": "Create ad",
+    "heroBadge": "AI Marketing Agent",
+    "heroSub": "Paste a product link, upload an image, or describe your product. Aura builds a TikTok-style vertical ad you can preview and download.",
+    "stepProduct": "Import product",
+    "stepAnalyze": "AI analysis",
+    "stepTemplate": "Template",
+    "stepRender": "Vertical video",
+    "templateSelected": "Template selected",
+    "templateHint": "I will use it for your ad once a product is ready."
   },
   "status": {
     "pending": "Pending",

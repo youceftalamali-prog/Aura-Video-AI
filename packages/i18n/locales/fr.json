@@ -253,7 +253,10 @@
     "ctaColon": "CTA :",
     "readyMade": "Modèles prêts à l'emploi",
     "chooseCategory": "Choisissez une catégorie adaptée à votre produit.",
-    "categoryDesc": "Modèles publicitaires adaptés aux produits pour cette catégorie."
+    "categoryDesc": "Modèles publicitaires adaptés aux produits pour cette catégorie.",
+    "browseAll": "Parcourir tous les modèles",
+    "openCategory": "Ouvrir la catégorie",
+    "premium": "Premium"
   },
   "library": {
     "title": "Bibliothèque",
@@ -359,6 +362,17 @@
     "noJobs": "Aucune tâche.",
     "viewPost": "Voir la publication",
     "retry": "Réessayer"
+  },
+  "home": {
+    "newAd": "Créer une pub",
+    "heroBadge": "Agent marketing IA",
+    "heroSub": "Collez un lien produit, importez une image ou décrivez votre produit. Aura crée une publicité verticale façon TikTok que vous pouvez prévisualiser et télécharger.",
+    "stepProduct": "Importer le produit",
+    "stepAnalyze": "Analyse IA",
+    "stepTemplate": "Modèle",
+    "stepRender": "Vidéo verticale",
+    "templateSelected": "Modèle sélectionné",
+    "templateHint": "Je l'utiliserai pour votre publicité dès que le produit est prêt."
   },
   "status": {
     "pending": "En attente",
