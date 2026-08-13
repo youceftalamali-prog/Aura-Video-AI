@@ -37,9 +37,8 @@ export function ProductsPage() {
 
   async function onCreateVideo(id: string) {
     try {
-      const flow = await api.createVideoFromProduct(id, { duration: 15, aspectRatio: '9:16' });
-      sessionStorage.setItem('aura:lastVideoFlow', JSON.stringify(flow));
-      navigate('/video');
+      await api.getProduct(id);
+      navigate(`/dashboard?product=${encodeURIComponent(id)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('products.createVideoFailedShort'));
     }

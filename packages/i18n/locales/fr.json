@@ -1,4 +1,64 @@
-{
+﻿{
+  "agent": {
+    "working": "Aura travaille…",
+    "send": "Envoyer",
+    "chooseModel": "Modèle IA",
+    "defaultModel": "Par défaut (Aura choisit)",
+    "fast": "Rapide",
+    "balanced": "Équilibré",
+    "smart": "Intelligent",
+    "strategyPick": "Approche",
+    "addProduct": "Produit",
+    "chooseProduct": "Choisir un produit",
+    "importNewProduct": "Importer un nouveau produit",
+    "productPickHint": "Aura utilisera ce produit comme contexte pour créer votre vidéo.",
+    "selectedProduct": "Produit",
+    "selectedTemplate": "Modèle",
+    "clearSelection": "Retirer",
+    "confirmTitle": "Aura a besoin de votre confirmation",
+    "confirmCredits": "Coût estimé : {{credits}} crédits",
+    "confirmContinue": "Continuer",
+    "confirmCancel": "Annuler",
+    "cancelReply": "cancel",
+    "useProduct": "Utilisez le produit {{name}} pour créer ma publicité.",
+    "useTemplateFor": "Utilisez le modèle {{name}}.",
+    "createWithTemplate": "Créez ma publicité avec le modèle {{name}}.",
+    "errorTitle": "Aura a rencontré un problème",
+    "retry": "Réessayer",
+    "videoReady": "Votre vidéo est prête",
+    "renderingNote": "Rendu en cours — le statut se met à jour automatiquement à la fin.",
+    "templateContext": "Modèle",
+    "tool": {
+      "product.list": "Produits listés",
+      "product.get": "Produit chargé",
+      "product.import.url": "Produit importé depuis une URL",
+      "product.import.text": "Produit importé depuis une description",
+      "product.import.image": "Produit importé depuis une image",
+      "product.analyze": "Produit analysé",
+      "product.intelligence": "Intelligence produit construite",
+      "product.hooks": "Accroches marketing générées",
+      "creative.strategy": "Stratégie créative créée",
+      "creative.script": "Script créé",
+      "creative.storyboard": "Storyboard créé",
+      "creative.recommendTemplate": "Modèle recommandé",
+      "template.list": "Modèles listés",
+      "template.get": "Modèle chargé",
+      "video.create": "Tâche vidéo créée",
+      "video.status": "Statut vidéo vérifié",
+      "video.cancel": "Vidéo annulée",
+      "billing.balance": "Solde de crédits vérifié",
+      "settings.get": "Paramètres chargés"
+    },
+    "step": {
+      "product": "Produit",
+      "strategy": "Stratégie",
+      "script": "Script",
+      "storyboard": "Storyboard",
+      "template": "Modèle",
+      "video": "Vidéo",
+      "render": "Rendu"
+    }
+  },
   "common": {
     "appName": "Aura Video AI",
     "loading": "Chargement…",
@@ -86,11 +146,13 @@
     "failed": "Échec",
     "connectionId": "ID de connexion",
     "selectProductFirst": "Sélectionnez d'abord un produit",
-    "projectIdRequired": "L'ID projet et le storyboard sont requis"
+    "projectIdRequired": "L'ID projet et le storyboard sont requis",
+    "noResults": "Aucun résultat",
+    "unknown": "Inconnu"
   },
   "nav": {
-    "dashboard": "Tableau de bord",
-    "aiStudio": "Studio IA",
+    "dashboard": "Accueil",
+    "aiStudio": "Aura IA",
     "creative": "Créatif",
     "video": "Studio vidéo",
     "products": "Produits",
@@ -99,7 +161,8 @@
     "library": "Bibliothèque",
     "billing": "Facturation",
     "publishing": "Publication",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "projects": "Projets"
   },
   "auth": {
     "loginTitle": "Connexion à Aura",
@@ -256,7 +319,8 @@
     "categoryDesc": "Modèles publicitaires adaptés aux produits pour cette catégorie.",
     "browseAll": "Parcourir tous les modèles",
     "openCategory": "Ouvrir la catégorie",
-    "premium": "Premium"
+    "premium": "Premium",
+    "all": "Tout"
   },
   "library": {
     "title": "Bibliothèque",
@@ -379,7 +443,11 @@
     "processing": "En cours",
     "completed": "Terminé",
     "failed": "Échoué",
-    "ready": "Prêt"
+    "ready": "Prêt",
+    "queued": "En file",
+    "composing": "Composition",
+    "rendering": "Rendu",
+    "canceled": "Annulé"
   },
   "settings": {
     "title": "Paramètres",
@@ -421,5 +489,26 @@
     "saved": "Paramètres enregistrés",
     "saveFailed": "Échec de l'enregistrement des paramètres",
     "loadFailed": "Échec du chargement des paramètres"
+  },
+  "workspace": {
+    "greetingMorning": "Bonjour, {{name}}",
+    "greetingAfternoon": "Bon après-midi, {{name}}",
+    "greetingEvening": "Bonsoir, {{name}}",
+    "whatToCreate": "Que voulez-vous que Aura crée ?",
+    "composerPlaceholder": "Décrivez ce que vous voulez créer… ex. une publicité haut de gamme de 15 secondes pour mon collier en or.",
+    "smartTemplates": "MODÈLES INTELLIGENTS",
+    "viewAll": "Tout voir",
+    "useTemplate": "Utiliser le modèle",
+    "recentVideos": "Vidéos récentes",
+    "recentProducts": "Produits récents",
+    "recentProjects": "Projets récents",
+    "noVideos": "Aucune vidéo pour l’instant — dites à Aura ce qu’elle doit créer ci-dessus.",
+    "noProducts": "Aucun produit pour l’instant",
+    "noProjects": "Aucun projet pour l’instant",
+    "importFirstProduct": "Importer votre premier produit",
+    "preview": "Aperçu",
+    "modelCapabilities": "{{capabilities}} · {{context}} de contexte",
+    "modelPricing": "{{prompt}} / 1K entrée · {{completion}} / 1K sortie",
+    "composerHint": "Aura planifie, crée et génère la vidéo pour vous de bout en bout."
   }
 }

@@ -1,4 +1,64 @@
-{
+﻿{
+  "agent": {
+    "working": "تشتغل Aura…",
+    "send": "إرسال",
+    "chooseModel": "نموذج الذكاء الاصطناعي",
+    "defaultModel": "الافتراضي (تختار Aura)",
+    "fast": "سريع",
+    "balanced": "متوازن",
+    "smart": "ذكي",
+    "strategyPick": "الأسلوب",
+    "addProduct": "المنتج",
+    "chooseProduct": "اختر منتجًا",
+    "importNewProduct": "استيراد منتج جديد",
+    "productPickHint": "ستستخدم Aura هذا المنتج كسياق لإنشاء الفيديو.",
+    "selectedProduct": "المنتج",
+    "selectedTemplate": "القالب",
+    "clearSelection": "إزالة",
+    "confirmTitle": "تحتاج Aura إلى تأكيدك",
+    "confirmCredits": "التكلفة المقدّرة: {{credits}} رصيد",
+    "confirmContinue": "متابعة",
+    "confirmCancel": "إلغاء",
+    "cancelReply": "إلغاء",
+    "useProduct": "استخدم المنتج {{name}} لإنشاء إعلاني.",
+    "useTemplateFor": "استخدم القالب {{name}}.",
+    "createWithTemplate": "أنشئ إعلاني باستخدام القالب {{name}}.",
+    "errorTitle": "واجهت Aura مشكلة",
+    "retry": "إعادة المحاولة",
+    "videoReady": "فيديو جاهز",
+    "renderingNote": "جارٍ العرض — يتحدّث الحال تلقائيًا عند الانتهاء.",
+    "templateContext": "القالب",
+    "tool": {
+      "product.list": "تم عرض المنتجات",
+      "product.get": "تم تحميل المنتج",
+      "product.import.url": "تم استيراد المنتج من رابط",
+      "product.import.text": "تم استيراد المنتج من وصف",
+      "product.import.image": "تم استيراد المنتج من صورة",
+      "product.analyze": "تم تحليل المنتج",
+      "product.intelligence": "تم بناء ذكاء المنتج",
+      "product.hooks": "تم توليد زوايا التسويق",
+      "creative.strategy": "تم إنشاء الاستراتيجية الإبداعية",
+      "creative.script": "تم إنشاء السيناريو",
+      "creative.storyboard": "تم إنشاء القصة المصوّرة",
+      "creative.recommendTemplate": "تم اقتراح القالب",
+      "template.list": "تم عرض القوالب",
+      "template.get": "تم تحميل القالب",
+      "video.create": "تم إنشاء مهمة الفيديو",
+      "video.status": "تم فحص حالة الفيديو",
+      "video.cancel": "تم إلغاء الفيديو",
+      "billing.balance": "تم فحص رصيد الاعتمادات",
+      "settings.get": "تم تحميل الإعدادات"
+    },
+    "step": {
+      "product": "المنتج",
+      "strategy": "الاستراتيجية",
+      "script": "السيناريو",
+      "storyboard": "القصة المصوّرة",
+      "template": "القالب",
+      "video": "الفيديو",
+      "render": "العرض"
+    }
+  },
   "common": {
     "appName": "Aura Video AI",
     "loading": "جاري التحميل…",
@@ -86,11 +146,13 @@
     "failed": "فشل",
     "connectionId": "معرّف الاتصال",
     "selectProductFirst": "اختر منتجًا أولاً",
-    "projectIdRequired": "معرّف المشروع واللوح القصصي مطلوبان"
+    "projectIdRequired": "معرّف المشروع واللوح القصصي مطلوبان",
+    "noResults": "لا توجد نتائج",
+    "unknown": "غير معروف"
   },
   "nav": {
-    "dashboard": "لوحة التحكم",
-    "aiStudio": "استوديو الذكاء",
+    "dashboard": "الرئيسية",
+    "aiStudio": "Aura AI",
     "creative": "الإبداع",
     "video": "استوديو الفيديو",
     "products": "المنتجات",
@@ -99,7 +161,8 @@
     "library": "المكتبة",
     "billing": "الفوترة",
     "publishing": "النشر",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "projects": "المشاريع"
   },
   "auth": {
     "loginTitle": "تسجيل الدخول إلى Aura",
@@ -256,7 +319,8 @@
     "categoryDesc": "قوالب إعلانية واعية بالمنتج لهذه الفئة.",
     "browseAll": "تصفح كل القوالب",
     "openCategory": "افتح الفئة",
-    "premium": "مميز"
+    "premium": "مميز",
+    "all": "الكل"
   },
   "library": {
     "title": "المكتبة",
@@ -379,7 +443,11 @@
     "processing": "قيد المعالجة",
     "completed": "مكتمل",
     "failed": "فشل",
-    "ready": "جاهز"
+    "ready": "جاهز",
+    "queued": "في الانتظار",
+    "composing": "تكوين المشهد",
+    "rendering": "جارٍ العرض",
+    "canceled": "ملغى"
   },
   "settings": {
     "title": "الإعدادات",
@@ -421,5 +489,26 @@
     "saved": "تم حفظ الإعدادات",
     "saveFailed": "فشل حفظ الإعدادات",
     "loadFailed": "فشل تحميل الإعدادات"
+  },
+  "workspace": {
+    "greetingMorning": "صباح الخير، {{name}}",
+    "greetingAfternoon": "مساء الخير، {{name}}",
+    "greetingEvening": "مساء الخير، {{name}}",
+    "whatToCreate": "ما الذي تريد أن تنشئه Aura؟",
+    "composerPlaceholder": "صف ما تريد إنشاءه… مثلًا: إعلان فاخر لقلادتي الذهبية مدته 15 ثانية.",
+    "smartTemplates": "قوالب ذكية",
+    "viewAll": "عرض الكل",
+    "useTemplate": "استخدم القالب",
+    "recentVideos": "أحدث الفيديوهات",
+    "recentProducts": "أحدث المنتجات",
+    "recentProjects": "أحدث المشاريع",
+    "noVideos": "لا توجد فيديوهات بعد — أخبر Aura بما تريد إنشاءه بالأعلى.",
+    "noProducts": "لا توجد منتجات بعد",
+    "noProjects": "لا توجد مشاريع بعد",
+    "importFirstProduct": "استيراد أول منتج",
+    "preview": "معاينة",
+    "modelCapabilities": "{{capabilities}} · سياق {{context}}",
+    "modelPricing": "{{prompt}} / 1K إدخال · {{completion}} / 1K إخراج",
+    "composerHint": "تخطط Aura وتنشئ وتولّد الفيديو من البداية إلى النهاية."
   }
 }

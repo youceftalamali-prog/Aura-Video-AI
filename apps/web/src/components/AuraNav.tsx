@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LanguageSelector } from './LanguageSelector';
@@ -6,10 +6,10 @@ import { setAccessToken, api } from '../lib/api';
 
 const NAV = [
   { to: '/dashboard', key: 'nav.dashboard', icon: '◉' },
+  { to: '/ai', key: 'nav.aiStudio', icon: '✦' },
+  { to: '/products', key: 'nav.products', icon: '◫' },
   { to: '/templates', key: 'nav.templates', icon: '▦' },
   { to: '/library', key: 'nav.library', icon: '▤' },
-  { to: '/products', key: 'nav.products', icon: '◫' },
-  { to: '/video', key: 'nav.video', icon: '◇' },
   { to: '/billing', key: 'nav.billing', icon: '◆' },
   { to: '/settings', key: 'nav.settings', icon: '⚙' },
 ] as const;
@@ -83,10 +83,10 @@ export function AuraNav() {
             <Link
               to="/billing"
               className="aura-badge border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-200"
-              title={t('billing.creditsTitle')}
+              title={t('billing.balance')}
             >
               <span className="text-[10px]">✦</span>
-              {balance.toLocaleString()} <span className="text-fuchsia-300/70">{t('billing.creditsShort')}</span>
+              {balance.toLocaleString()} <span className="text-fuchsia-300/70">{t('billing.creditsWord')}</span>
             </Link>
           )}
           <LanguageSelector />

@@ -64,6 +64,11 @@ import type {
   WorkspaceSettingsPayload,
   UpdateWorkspaceSettingsInput,
   AiModelOption,
+  AgentConversationRow,
+  AgentConversationDetail,
+  CreateAgentConversationInput,
+  SendAgentMessageInput,
+  AgentTurnResult,
 } from '@aura/types';
 
 export interface AuraClientOptions {
@@ -499,5 +504,21 @@ export class AuraClient {
 
   async updateSettingsWorkspace(input: UpdateWorkspaceSettingsInput & { workspaceId?: string }): Promise<WorkspaceSettingsPayload> {
     return this.request<WorkspaceSettingsPayload>('PATCH', '/api/v1/settings/workspace', input);
+  }
+
+  async createAgentConversation(input?: CreateAgentConversationInput): Promise<AgentConversationRow> {
+    return this.request<AgentConversationRow>('POST', '/api/v1/agent/conversations', input ?? {});
+  }
+
+  async getAgentConversation(id: string): Promise<AgentConversationDetail> {
+    return this.request<AgentConversationDetail>('GET', `/api/v1/agent/conversations/${id}`);
+  }
+
+  async sendAgentMessage(id: string, input: SendAgentMessageInput): Promise<AgentTurnResult> {
+    return this.request<AgentTurnResult>('POST', `/api/v1/agent/conversations/${id}/messages`, input);
+  }
+
+  async cancelAgentConversation(id: string): Promise<AgentConversationRow> {
+    return this.request<AgentConversationRow>('POST', `/api/v1/agent/conversations/${id}/cancel`);
   }
 }
