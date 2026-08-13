@@ -29,7 +29,7 @@ export class TemplateService {
 
   async getByIdOrThrow(id: string): Promise<Template> {
     const t = await this.getById(id);
-    if (!t || t.status !== 'active') {
+    if (!t || t.status !== 'published') {
       throw new NotFoundError('Template');
     }
     return t;
@@ -46,7 +46,7 @@ export class TemplateService {
     limit = 5,
   ): TemplateRecommendation[] {
     const scored = all
-      .filter((t) => t.status === 'active')
+      .filter((t) => t.status === 'published')
       .map((t) => {
         let score = 0.4;
         const reasons: string[] = [];
