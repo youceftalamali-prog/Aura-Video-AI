@@ -148,7 +148,10 @@
     "selectProductFirst": "Sélectionnez d'abord un produit",
     "projectIdRequired": "L'ID projet et le storyboard sont requis",
     "noResults": "Aucun résultat",
-    "unknown": "Inconnu"
+    "unknown": "Inconnu",
+    "output": "Résultat",
+    "recommended": "Recommandé",
+    "video": "Vidéo"
   },
   "nav": {
     "dashboard": "Accueil",
@@ -214,7 +217,8 @@
     "longDescription": "Description longue",
     "summary": "Résumé",
     "productLabel": "Produit",
-    "recommendedNextStep": "Prochaine étape recommandée"
+    "recommendedNextStep": "Prochaine étape recommandée",
+    "productColon": "Produit : "
   },
   "creative": {
     "title": "Studio créatif",
@@ -237,7 +241,14 @@
     "product": "Produit",
     "template": "Modèle",
     "video": "Vidéo",
-    "projectIdHint": "Utilisez un ID de projet existant vous appartenant"
+    "projectIdHint": "Utilisez un ID de projet existant vous appartenant",
+    "angleColon": "Angle : ",
+    "durationColon": "Durée : ",
+    "hookColon": "Accroche : ",
+    "messageColon": "Message : ",
+    "pollingStatus": "Génération en cours…",
+    "templateRecommendations": "Recommandations de modèles",
+    "videoGenerationJob": "Tâche de génération vidéo"
   },
   "video": {
     "title": "Studio vidéo",
@@ -290,7 +301,12 @@
     "createVideoFailed": "Échec du flux de création vidéo",
     "loadFailed": "Échec du chargement des produits",
     "createVideoFailedShort": "Échec de création de la vidéo",
-    "importFlow": "URL, image ou description → intelligence produit IA → Créer une vidéo"
+    "importFlow": "URL, image ou description → intelligence produit IA → Créer une vidéo",
+    "factsVsMarketing": "Faits vs marketing",
+    "marketingAngles": "Angles marketing",
+    "marketingInferred": "Marketing (déduit)",
+    "primaryBenefit": "Bénéfice principal",
+    "productImport": "Import de produit"
   },
   "templates": {
     "title": "Modèles",
@@ -331,7 +347,10 @@
     "createProject": "Créer un projet",
     "failedToLoad": "Échec du chargement de la bibliothèque",
     "emptyAssets": "Aucune ressource. Les vidéos terminées apparaissent ici.",
-    "noProjects": "Aucun projet. Créez-en un ou générez une vidéo depuis un modèle."
+    "noProjects": "Aucun projet. Créez-en un ou générez une vidéo depuis un modèle.",
+    "openInStudio": "Ouvrir dans le studio",
+    "openVideo": "Ouvrir la vidéo",
+    "projectsAndAssets": "Projets et ressources"
   },
   "billing": {
     "title": "Facturation",
@@ -382,7 +401,9 @@
     "redirecting": "Redirection vers PayPal…",
     "creating": "Création de l'abonnement PayPal…",
     "alreadyActive": "Un abonnement actif existe déjà",
-    "period": "Période de facturation"
+    "period": "Période de facturation",
+    "creditsLower": "crédits",
+    "planIdColon": "ID du plan : "
   },
   "errors": {
     "VIDEO_GENERATION_FAILED": "Échec de la génération vidéo",
@@ -509,6 +530,8 @@
     "preview": "Aperçu",
     "modelCapabilities": "{{capabilities}} · {{context}} de contexte",
     "modelPricing": "{{prompt}} / 1K entrée · {{completion}} / 1K sortie",
-    "composerHint": "Aura planifie, crée et génère la vidéo pour vous de bout en bout."
+    "composerHint": "Aura planifie, crée et génère la vidéo pour vous de bout en bout.",
+    "emptyChat": "Commencez ici — décrivez votre produit ou collez un lien, et Aura conçoit votre publicité.",
+    "deepLinkError": "Impossible de charger l'élément sélectionné ({{value}})."
   }
 }

@@ -34,6 +34,31 @@ function nextMessageId(): string {
 
 const TERMINAL_JOB_STATUSES = new Set(['completed', 'failed', 'canceled']);
 
+function placeholderTemplate(id: string): LibraryTemplate {
+  return {
+    id,
+    slug: id,
+    name: id,
+    description: null,
+    category: '',
+    subCategory: null,
+    thumbnailUrl: null,
+    previewVideoUrl: null,
+    hasRealPreview: false,
+    durationSeconds: null,
+    aspectRatio: '9:16',
+    creditsCost: 0,
+    status: 'published',
+    isPremium: false,
+    isFeatured: false,
+    sortOrder: 0,
+    tags: [],
+    scenes: [],
+    supportedProductTypes: [],
+    metadata: null,
+  };
+}
+
 function jobKey(job: VideoGenerationJobPublic): string {
   return `${job.id}:${job.status}:${job.progress ?? ''}:${job.currentStage ?? ''}`;
 }
@@ -173,29 +198,7 @@ export function useAgentWorkspace(): AgentWorkspaceState {
           });
         }
         if (sel.selectedTemplateId) {
-          const tpl: LibraryTemplate = {
-            id: sel.selectedTemplateId,
-            slug: sel.selectedTemplateId,
-            name: sel.selectedTemplateId,
-            description: null,
-            category: '',
-            subCategory: null,
-            thumbnailUrl: null,
-            previewVideoUrl: null,
-            hasRealPreview: false,
-            durationSeconds: null,
-            aspectRatio: '9:16',
-            creditsCost: 0,
-            status: 'published',
-            isPremium: false,
-            isFeatured: false,
-            sortOrder: 0,
-            tags: [],
-            scenes: [],
-            supportedProductTypes: [],
-            metadata: null,
-          };
-          setTemplate(tpl);
+          setTemplate(placeholderTemplate(sel.selectedTemplateId));
         }
         if (sel.activeVideoJobId && turn.toolCalls.some((tc) => tc.name === 'video.create' && tc.ok)) {
           pollJob(sel.activeVideoJobId);
@@ -282,6 +285,12 @@ export function useAgentWorkspace(): AgentWorkspaceState {
             if (pid) {
               const match = productList.find((p) => p.id === pid);
               if (match) setProduct(match);
+            }
+            const tid = detail.conversation.selectedTemplateId;
+            if (tid) {
+              const tplList = await api.listTemplates().catch(() => [] as LibraryTemplate[]);
+              const match = tplList.find((tp) => tp.id === tid || tp.slug === tid);
+              setTemplate(match ?? placeholderTemplate(tid));
             }
             return;
           }

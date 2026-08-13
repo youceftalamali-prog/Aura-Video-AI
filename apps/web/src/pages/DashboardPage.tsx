@@ -93,7 +93,7 @@ export function DashboardPage() {
             <p className="mt-0.5 text-xs text-violet-300/50">{t('workspace.composerHint')}</p>
             {paramError && (
               <p className="mt-2 text-xs text-rose-300/80">
-                {paramError}
+                {t('workspace.deepLinkError', { value: paramError })}
               </p>
             )}
           </header>

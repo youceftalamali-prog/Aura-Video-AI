@@ -148,7 +148,10 @@
     "selectProductFirst": "اختر منتجًا أولاً",
     "projectIdRequired": "معرّف المشروع واللوح القصصي مطلوبان",
     "noResults": "لا توجد نتائج",
-    "unknown": "غير معروف"
+    "unknown": "غير معروف",
+    "output": "النتيجة",
+    "recommended": "موصى به",
+    "video": "الفيديو"
   },
   "nav": {
     "dashboard": "الرئيسية",
@@ -214,7 +217,8 @@
     "longDescription": "وصف طويل",
     "summary": "الملخص",
     "productLabel": "المنتج",
-    "recommendedNextStep": "الخطوة التالية الموصى بها"
+    "recommendedNextStep": "الخطوة التالية الموصى بها",
+    "productColon": "المنتج: "
   },
   "creative": {
     "title": "الاستوديو الإبداعي",
@@ -237,7 +241,14 @@
     "product": "منتج",
     "template": "قالب",
     "video": "فيديو",
-    "projectIdHint": "استخدم معرّف مشروع موجود تملكه"
+    "projectIdHint": "استخدم معرّف مشروع موجود تملكه",
+    "angleColon": "الزاوية: ",
+    "durationColon": "المدة: ",
+    "hookColon": "الافتتاحية: ",
+    "messageColon": "الرسالة: ",
+    "pollingStatus": "جارٍ الإنشاء…",
+    "templateRecommendations": "توصيات القوالب",
+    "videoGenerationJob": "مهمة توليد الفيديو"
   },
   "video": {
     "title": "استوديو الفيديو",
@@ -290,7 +301,12 @@
     "createVideoFailed": "فشل مسار إنشاء الفيديو",
     "loadFailed": "فشل تحميل المنتجات",
     "createVideoFailedShort": "فشل إنشاء الفيديو",
-    "importFlow": "رابط أو صورة أو وصف → ذكاء المنتج → إنشاء فيديو"
+    "importFlow": "رابط أو صورة أو وصف → ذكاء المنتج → إنشاء فيديو",
+    "factsVsMarketing": "الحقائق مقابل التسويق",
+    "marketingAngles": "زوايا التسويق",
+    "marketingInferred": "التسويق (مستنتج)",
+    "primaryBenefit": "المنفعة الأساسية",
+    "productImport": "استيراد المنتج"
   },
   "templates": {
     "title": "القوالب",
@@ -331,7 +347,10 @@
     "createProject": "إنشاء مشروع",
     "failedToLoad": "فشل تحميل المكتبة",
     "emptyAssets": "لا أصول بعد. تظهر هنا الفيديوهات المكتملة.",
-    "noProjects": "لا مشاريع بعد. أنشئ واحدًا أو ولّد فيديو من قالب."
+    "noProjects": "لا مشاريع بعد. أنشئ واحدًا أو ولّد فيديو من قالب.",
+    "openInStudio": "فتح في الاستوديو",
+    "openVideo": "فتح الفيديو",
+    "projectsAndAssets": "المشاريع والأصول"
   },
   "billing": {
     "title": "الفوترة",
@@ -382,7 +401,9 @@
     "redirecting": "إعادة التوجيه إلى PayPal…",
     "creating": "جاري إنشاء اشتراك PayPal…",
     "alreadyActive": "يوجد اشتراك نشط بالفعل",
-    "period": "فترة الفوترة"
+    "period": "فترة الفوترة",
+    "creditsLower": "رصيد",
+    "planIdColon": "معرّف الخطة: "
   },
   "errors": {
     "VIDEO_GENERATION_FAILED": "فشل إنشاء الفيديو",
@@ -509,6 +530,8 @@
     "preview": "معاينة",
     "modelCapabilities": "{{capabilities}} · سياق {{context}}",
     "modelPricing": "{{prompt}} / 1K إدخال · {{completion}} / 1K إخراج",
-    "composerHint": "تخطط Aura وتنشئ وتولّد الفيديو من البداية إلى النهاية."
+    "composerHint": "تخطط Aura وتنشئ وتولّد الفيديو من البداية إلى النهاية.",
+    "emptyChat": "ابدأ هنا — صف منتجك أو الصق رابطًا، وتصمم Aura إعلانك.",
+    "deepLinkError": "تعذّر تحميل العنصر المحدد ({{value}})."
   }
 }

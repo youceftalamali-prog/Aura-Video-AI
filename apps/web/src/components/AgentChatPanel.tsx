@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { VideoGenerationJobPublic } from '@aura/types';
@@ -7,8 +7,6 @@ import { AgentStrategyPicker } from './AgentStrategyPicker';
 import { ContextChips } from './ContextChips';
 import { ProductPickerModal } from './ProductPickerModal';
 import type { AgentWorkspaceState, WorkspaceMessage } from '../agent/useAgentWorkspace';
-
-const TERMINAL_STATUSES = new Set(['completed', 'failed', 'canceled']);
 
 const STATUS_KEY: Record<string, string> = {
   queued: 'status.queued',
@@ -60,7 +58,7 @@ function VideoResultCard({ job }: { job: VideoGenerationJobPublic }) {
           <video src={url} controls playsInline className="h-40 w-24 rounded-lg bg-black object-contain" />
           <div className="min-w-0 flex-1 space-y-1.5 text-xs">
             <p className="text-violet-300/60">{new Date(job.completedAt ?? job.updatedAt).toLocaleString()}</p>
-            <p className="text-violet-100/80">{job.progress ?? 100}% · {t('common.download')}</p>
+            <p className="text-violet-100/80">{job.progress ?? 100}%</p>
             <a href={url} download target="_blank" rel="noreferrer" className="aura-btn-primary !px-3 !py-1.5 text-xs">
               {t('common.download')}
             </a>
@@ -82,11 +80,6 @@ export function AgentChatPanel({ workspace }: { workspace: AgentWorkspaceState }
   const [composerText, setComposerText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const videoMessageId = useMemo(() => {
-    const newest = [...workspace.messages].reverse().find((m) => m.job);
-    return newest?.id ?? null;
-  }, [workspace.messages]);
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [workspace.messages, workspace.busy]);
@@ -99,8 +92,6 @@ export function AgentChatPanel({ workspace }: { workspace: AgentWorkspaceState }
     setComposerText('');
     void workspace.send(text);
   }
-
-  const watchingJob = workspace.messages.find((m) => m.id === videoMessageId && m.job && !TERMINAL_STATUSES.has(m.job.status))?.job ?? null;
 
   return (
     <div className="space-y-4">
@@ -175,6 +166,13 @@ export function AgentChatPanel({ workspace }: { workspace: AgentWorkspaceState }
       />
 
       <div className="space-y-4">
+        {workspace.messages.length === 0 && !workspace.busy && (
+          <div className="rounded-2xl border border-dashed border-white/15 px-6 py-8 text-center">
+            <p className="text-sm font-semibold text-violet-100">✦ {t('workspace.emptyChat')}</p>
+            <p className="mt-1 text-xs text-violet-300/60">{t('workspace.composerHint')}</p>
+          </div>
+        )}
+
         {workspace.messages.map((m) => (
           <MessageRow key={m.id} message={m} />
         ))}
@@ -188,8 +186,6 @@ export function AgentChatPanel({ workspace }: { workspace: AgentWorkspaceState }
             </div>
           </div>
         )}
-
-        {watchingJob && <div className="flex items-center gap-2 pl-11 text-xs text-violet-300/60">{'⟳'} {t(JOB_STATUS_KEY(watchingJob.status))}</div>}
 
         {workspace.confirmation && (
           <div className="aura-panel-strong ms-11 max-w-lg space-y-3 border-fuchsia-400/30 p-4">

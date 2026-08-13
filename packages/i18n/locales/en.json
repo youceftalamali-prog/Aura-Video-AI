@@ -148,7 +148,10 @@
     "selectProductFirst": "Select a product first",
     "projectIdRequired": "Project ID and storyboard are required",
     "noResults": "No results",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "output": "Output",
+    "recommended": "Recommended",
+    "video": "Video"
   },
   "nav": {
     "dashboard": "Home",
@@ -214,7 +217,8 @@
     "longDescription": "Long description",
     "summary": "Summary",
     "productLabel": "Product",
-    "recommendedNextStep": "Recommended next step"
+    "recommendedNextStep": "Recommended next step",
+    "productColon": "Product: "
   },
   "creative": {
     "title": "Creative Studio",
@@ -237,7 +241,14 @@
     "product": "Product",
     "template": "Template",
     "video": "Video",
-    "projectIdHint": "Use an existing project id you own"
+    "projectIdHint": "Use an existing project id you own",
+    "angleColon": "Angle: ",
+    "durationColon": "Duration: ",
+    "hookColon": "Hook: ",
+    "messageColon": "Message: ",
+    "pollingStatus": "Generating…",
+    "templateRecommendations": "Template recommendations",
+    "videoGenerationJob": "Video generation job"
   },
   "video": {
     "title": "Video Studio",
@@ -290,7 +301,12 @@
     "createVideoFailed": "Create video workflow failed",
     "loadFailed": "Failed to load products",
     "createVideoFailedShort": "Create video failed",
-    "importFlow": "URL, image, or description → AI product intelligence → Create video"
+    "importFlow": "URL, image, or description → AI product intelligence → Create video",
+    "factsVsMarketing": "Facts vs marketing",
+    "marketingAngles": "Marketing angles",
+    "marketingInferred": "Marketing (inferred)",
+    "primaryBenefit": "Primary benefit",
+    "productImport": "Product import"
   },
   "templates": {
     "title": "Templates",
@@ -331,7 +347,10 @@
     "createProject": "Create project",
     "failedToLoad": "Failed to load library",
     "emptyAssets": "No assets yet. Completed video generations appear here.",
-    "noProjects": "No projects yet. Create one or generate a video from a template."
+    "noProjects": "No projects yet. Create one or generate a video from a template.",
+    "openInStudio": "Open in studio",
+    "openVideo": "Open video",
+    "projectsAndAssets": "Projects & assets"
   },
   "billing": {
     "title": "Billing",
@@ -382,7 +401,9 @@
     "redirecting": "Redirecting to PayPal…",
     "creating": "Creating PayPal subscription…",
     "alreadyActive": "An active subscription already exists",
-    "period": "Billing period"
+    "period": "Billing period",
+    "creditsLower": "credits",
+    "planIdColon": "Plan ID: "
   },
   "errors": {
     "VIDEO_GENERATION_FAILED": "Video generation failed",
@@ -509,6 +530,8 @@
     "preview": "Preview",
     "modelCapabilities": "{{capabilities}} · {{context}} context",
     "modelPricing": "{{prompt}} / 1K in · {{completion}} / 1K out",
-    "composerHint": "Aura plans, creates, and generates the video for you from start to finish."
+    "composerHint": "Aura plans, creates, and generates the video for you from start to finish.",
+    "emptyChat": "Start here — describe your product or paste a link, and Aura designs your ad.",
+    "deepLinkError": "Couldn't load the item you selected ({{value}})."
   }
 }
