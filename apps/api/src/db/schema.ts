@@ -472,3 +472,50 @@ export const aiProviderConfigsRelations = relations(aiProviderConfigs, ({ one })
     references: [workspaces.id],
   }),
 }));
+
+export const agentConversations = pgTable(
+  'agent_conversations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 200 }).notNull().default('New conversation'),
+    status: varchar('status', { length: 20 }).notNull().default('active'),
+    selectedProductId: uuid('selected_product_id').references(() => products.id, { onDelete: 'set null' }),
+    selectedTemplateId: uuid('selected_template_id').references(() => templates.id, { onDelete: 'set null' }),
+    activeVideoJobId: uuid('active_video_job_id').references(() => videoGenerationJobs.id, { onDelete: 'set null' }),
+    language: varchar('language', { length: 20 }),
+    pendingConfirmation: jsonb('pending_confirmation'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('agent_conversations_user_id_idx').on(table.userId),
+    workspaceIdIdx: index('agent_conversations_workspace_id_idx').on(table.workspaceId),
+  }),
+);
+
+export const agentMessages = pgTable(
+  'agent_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => agentConversations.id, { onDelete: 'cascade' }),
+    role: varchar('role', { length: 20 }).notNull(),
+    content: text('content'),
+    toolName: varchar('tool_name', { length: 120 }),
+    toolArgs: jsonb('tool_args'),
+    toolResult: jsonb('tool_result'),
+    modelInfo: jsonb('model_info'),
+    step: integer('step'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    conversationIdx: index('agent_messages_conversation_idx').on(table.conversationId, table.createdAt),
+  }),
+);

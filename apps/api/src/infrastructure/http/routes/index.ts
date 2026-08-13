@@ -7,6 +7,7 @@ import { createAuthRoutes } from './auth.routes.js';
 import { createDashboardRoutes } from './dashboard.routes.js';
 import { createAdminRoutes } from './admin.routes.js';
 import { createAIModule } from '../../../modules/ai/index.js';
+import { createAgentModule } from '../../../modules/agent/index.js';
 import { createCreativeModule } from '../../../modules/creative/index.js';
 import { createVideoModule } from '../../../modules/video/index.js';
 import { createStudioModule } from '../../../modules/studio/index.js';
@@ -24,6 +25,7 @@ export function createApiRouter(deps: {
 }): Router {
   const router = Router();
   const aiModule = createAIModule();
+  const agentModule = createAgentModule();
   const creativeModule = createCreativeModule();
   const videoModule = createVideoModule();
   const studioModule = createStudioModule();
@@ -38,6 +40,7 @@ export function createApiRouter(deps: {
   router.use('/dashboard', createDashboardRoutes(deps.dashboardController));
   router.use('/admin', createAdminRoutes(deps.adminController));
   router.use('/ai', aiModule.routes);
+  router.use('/agent', agentModule.routes);
   router.use('/creative', creativeModule.routes);
   router.use('/video', videoModule.routes);
   router.use('/studio', studioModule.routes);
