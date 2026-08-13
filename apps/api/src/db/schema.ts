@@ -13,6 +13,7 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { isNull } from 'drizzle-orm';
 
 export const users = pgTable(
   'users',
@@ -437,3 +438,37 @@ export const publishingJobs = pgTable(
     ),
   }),
 );
+
+export const aiProviderConfigs = pgTable(
+  'ai_provider_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    // NULL = system/default scope; set = workspace-specific override
+    workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+    providerId: varchar('provider_id', { length: 40 }).notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    baseUrl: varchar('base_url', { length: 500 }),
+    encryptedApiKey: text('encrypted_api_key'),
+    defaultModelId: varchar('default_model_id', { length: 200 }),
+    capabilities: jsonb('capabilities').notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    workspaceProviderIdx: uniqueIndex('ai_provider_configs_workspace_provider_idx').on(
+      table.workspaceId,
+      table.providerId,
+    ),
+    systemProviderIdx: uniqueIndex('ai_provider_configs_system_provider_idx')
+      .on(table.providerId)
+      .where(isNull(table.workspaceId)),
+    workspaceIdx: index('ai_provider_configs_workspace_idx').on(table.workspaceId),
+  }),
+);
+
+export const aiProviderConfigsRelations = relations(aiProviderConfigs, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [aiProviderConfigs.workspaceId],
+    references: [workspaces.id],
+  }),
+}));

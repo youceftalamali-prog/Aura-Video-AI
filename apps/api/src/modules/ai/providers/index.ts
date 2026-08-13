@@ -3,6 +3,7 @@ import type { IAIProvider } from '../interfaces/ai-provider.interface.js';
 import { OpenAIProvider } from './openai.provider.js';
 import type { IUrlMetadataExtractor } from '../interfaces/url-extractor.interface.js';
 import { HtmlUrlMetadataExtractor } from './html-url-extractor.js';
+import { resetAIGateway } from '../gateway/index.js';
 
 let aiProvider: IAIProvider | null = null;
 let urlExtractor: IUrlMetadataExtractor | null = null;
@@ -29,7 +30,9 @@ export function getUrlMetadataExtractor(): IUrlMetadataExtractor {
 export function resetAIProviders(): void {
   aiProvider = null;
   urlExtractor = null;
+  resetAIGateway();
 }
 
 export { OpenAIProvider } from './openai.provider.js';
+export { OpenRouterProvider } from './openrouter.provider.js';
 export { HtmlUrlMetadataExtractor } from './html-url-extractor.js';

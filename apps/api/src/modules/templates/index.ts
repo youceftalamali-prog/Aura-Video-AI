@@ -1,5 +1,6 @@
 import { getDb } from '../../db/client.js';
 import { getAIProvider, getUrlMetadataExtractor } from '../ai/providers/index.js';
+import { getAIGateway } from '../ai/gateway/index.js';
 import { ProductAnalysisService } from '../ai/services/product-analysis.service.js';
 import { ProductRepository } from '../products/services/product.repository.js';
 import { UrlImportService } from '../products/services/url-import.service.js';
@@ -19,7 +20,7 @@ export function createTemplatesModule() {
   const db = getDb();
   const ai = getAIProvider();
   const urlExtractor = getUrlMetadataExtractor();
-  const analysis = new ProductAnalysisService(ai, urlExtractor);
+  const analysis = new ProductAnalysisService(getAIGateway(), urlExtractor);
   const intelligence = new ProductIntelligenceService(ai);
   const strategy = new CreativeStrategyService(ai);
   const script = new AdScriptService(ai);

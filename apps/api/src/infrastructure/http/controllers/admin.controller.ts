@@ -3,11 +3,19 @@ import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import type { UserRepository } from '../../../domain/repositories/user.repository.js';
 import type { SettingsRepository } from '../../../domain/repositories/settings.repository.js';
 import type { ApiResponse } from '@aura/types';
+import type { AIGateway } from '../../../modules/ai/gateway/ai-gateway.js';
+import { CONFIGURABLE_PROVIDERS, type ProviderConfigService } from '../../../modules/ai/services/provider-config.service.js';
+import {
+  createProviderConfigSchema,
+  updateProviderConfigSchema,
+} from '../../../modules/ai/dto/provider-config.schemas.js';
 
 export class AdminController {
   constructor(
     private readonly userRepo: UserRepository,
     private readonly settingsRepo: SettingsRepository,
+    private readonly providerConfigs: ProviderConfigService,
+    private readonly aiGateway: AIGateway,
   ) {}
 
   listUsers = async (
@@ -112,6 +120,104 @@ export class AdminController {
         },
       ];
       res.status(200).json({ success: true, data: plans } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listAiProviders = async (
+    _req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const configs = await this.providerConfigs.list();
+      const registry = await this.aiGateway.getRegistryStatus();
+      const providers = await Promise.all(
+        CONFIGURABLE_PROVIDERS.map(async (providerId) => {
+          const availability = await this.providerConfigs.availabilityFor(providerId);
+          const models =
+            providerId === 'openrouter' && registry.models.loaded
+              ? { count: registry.models.catalogCount, refreshedAt: registry.models.refreshedAt }
+              : null;
+          return {
+            providerId,
+            availability,
+            configs: configs.filter((c) => c.providerId === providerId),
+            models,
+          };
+        }),
+      );
+      res.status(200).json({ success: true, data: { providers, registry } } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createAiProvider = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const body = createProviderConfigSchema.parse(req.body);
+      const config = await this.providerConfigs.create(body);
+      res.status(201).json({ success: true, data: config } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateAiProvider = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const id = req.params.id;
+      if (!id) {
+        res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'id is required' } });
+        return;
+      }
+      const body = updateProviderConfigSchema.parse(req.body);
+      const config = await this.providerConfigs.update(id, body);
+      res.status(200).json({ success: true, data: config } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  deleteAiProvider = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const id = req.params.id;
+      if (!id) {
+        res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'id is required' } });
+        return;
+      }
+      await this.providerConfigs.delete(id);
+      res.status(200).json({ success: true } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  testAiProvider = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const id = req.params.id;
+      if (!id) {
+        res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'id is required' } });
+        return;
+      }
+      const result = await this.providerConfigs.test(id);
+      res.status(200).json({ success: true, data: result } satisfies ApiResponse);
     } catch (err) {
       next(err);
     }

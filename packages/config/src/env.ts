@@ -55,6 +55,12 @@ const envSchema = z.object({
   AI_TIMEOUT_MS: z.coerce.number().default(60000),
   AI_RATE_LIMIT_MAX: z.coerce.number().default(20),
 
+  // OpenRouter provider (Phase B, additive; excluded when no key is set)
+  OPENROUTER_API_KEY: z.string().optional().default(''),
+  OPENROUTER_BASE_URL: z.string().url().optional().default('https://openrouter.ai/api/v1'),
+  OPENROUTER_DEFAULT_MODEL: z.string().optional().default(''),
+  OPENROUTER_CATALOG_TTL_MS: z.coerce.number().optional().default(3600000),
+
   // Media / Video generation providers
   MEDIA_PROVIDER: z
     .enum(['openai', 'fal', 'runway', 'kling', 'veo', 'google', 'none'])

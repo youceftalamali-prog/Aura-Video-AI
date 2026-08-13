@@ -1,7 +1,7 @@
 import { languageSystemInstruction } from '../utils/language-prompt.js';
 import { getEnv } from '@aura/config';
 import { AppError, ValidationError } from '@aura/shared';
-import type { ProductAnalysis } from '@aura/types';
+import type { AICapability, ProductAnalysis } from '@aura/types';
 import type {
   AnalyzeImageParams,
   AnalyzeProductParams,
@@ -16,15 +16,30 @@ interface ChatMessage {
   content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
 }
 
+/** Runtime override for a provider's credentials/base URL/default model. */
+export interface ProviderRuntimeConfig {
+  apiKey?: string;
+  baseUrl?: string;
+  defaultModelId?: string;
+}
+
+/**
+ * OpenAI-compatible chat completion provider.
+ * Internals are protected so OpenAI-compatible providers (e.g. OpenRouter)
+ * can subclass and override only credential/base-url/model resolution.
+ * Optional runtime config (from DB provider configs) overrides env values.
+ */
 export class OpenAIProvider implements IAIProvider {
-  readonly name = 'openai';
+  readonly name: string = 'openai';
+
+  constructor(protected readonly config: ProviderRuntimeConfig = {}) {}
 
   private languageDirective(lang?: string): string {
     return languageSystemInstruction(lang);
   }
 
-  private get apiKey(): string {
-    const key = getEnv().AI_API_KEY;
+  protected get apiKey(): string {
+    const key = this.config.apiKey ?? getEnv().AI_API_KEY;
     if (!key) {
       throw new AppError(
         'AI provider is not configured. Set AI_API_KEY in environment.',
@@ -35,16 +50,24 @@ export class OpenAIProvider implements IAIProvider {
     return key;
   }
 
-  private get baseUrl(): string {
-    return getEnv().AI_BASE_URL.replace(/\/$/, '');
+  protected get baseUrl(): string {
+    return (this.config.baseUrl ?? getEnv().AI_BASE_URL).replace(/\/$/, '');
   }
 
-  private get model(): string {
-    return getEnv().AI_MODEL;
+  protected get model(): string {
+    return this.config.defaultModelId ?? getEnv().AI_MODEL;
   }
 
-  private get visionModel(): string {
-    return getEnv().AI_VISION_MODEL;
+  protected get visionModel(): string {
+    return this.config.defaultModelId ?? getEnv().AI_VISION_MODEL;
+  }
+
+  /**
+   * Resolves the model for a call: an explicit per-request modelId wins,
+   * otherwise the provider default for the capability is used.
+   */
+  protected resolveModel(capability: AICapability, modelId?: string): string {
+    return modelId ?? (capability === 'analyze-image' ? this.visionModel : this.model);
   }
 
   async analyzeText(params: AnalyzeTextParams): Promise<string> {
@@ -53,7 +76,7 @@ export class OpenAIProvider implements IAIProvider {
       { role: 'system', content: directive + '\n' + params.systemPrompt },
       { role: 'user', content: params.userPrompt },
     ];
-    return this.chatCompletion(messages, this.model, true);
+    return this.chatCompletion(messages, this.resolveModel('analyze-text', params.modelId), true);
   }
 
   async generateStructuredOutput<T>(params: GenerateStructuredParams<T>): Promise<T> {
@@ -170,7 +193,7 @@ Respond in the same language as the product description when possible.`;
         ],
       },
     ];
-    return this.chatCompletion(messages, this.visionModel, true);
+    return this.chatCompletion(messages, this.resolveModel('analyze-image', params.modelId), true);
   }
 
   private buildImageContent(params: AnalyzeImageParams): {
@@ -230,7 +253,7 @@ Respond in the same language as the product description when possible.`;
     return result.data;
   }
 
-  private async chatCompletion(
+  protected async chatCompletion(
     messages: ChatMessage[],
     model: string,
     jsonMode: boolean,

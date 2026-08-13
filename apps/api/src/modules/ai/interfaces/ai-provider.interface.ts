@@ -4,6 +4,8 @@ export interface AnalyzeTextParams {
   systemPrompt: string;
   userPrompt: string;
   jsonSchemaHint?: string;
+  /** Optional explicit model id requested for this call (must exist in the model registry). */
+  modelId?: string;
 }
 
 export interface AnalyzeProductParams {
@@ -15,6 +17,8 @@ export interface AnalyzeProductParams {
   mimeType?: string;
   metadata?: Record<string, unknown>;
   extractedMeta?: ProductUrlMetadata | null;
+  /** Optional explicit model id requested for this call (must exist in the model registry). */
+  modelId?: string;
 }
 
 export interface GenerateStructuredParams<T> {
@@ -22,6 +26,8 @@ export interface GenerateStructuredParams<T> {
   userPrompt: string;
   schemaDescription: string;
   parse: (raw: unknown) => T;
+  /** Optional explicit model id requested for this call (must exist in the model registry). */
+  modelId?: string;
 }
 
 export interface AnalyzeImageParams {
@@ -30,6 +36,8 @@ export interface AnalyzeImageParams {
   mimeType?: string;
   prompt: string;
   systemPrompt?: string;
+  /** Optional explicit model id requested for this call (must exist in the model registry). */
+  modelId?: string;
 }
 
 export interface IAIProvider {

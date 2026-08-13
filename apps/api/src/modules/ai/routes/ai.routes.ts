@@ -22,6 +22,7 @@ export function createAIRoutes(controller: AIController): Router {
   router.use(requireAuth);
   router.use(aiLimiter);
 
+  router.get('/models', controller.listModels);
   router.post('/analyze-product-text', controller.analyzeProductText);
   router.post('/analyze-product-url', controller.analyzeProductUrl);
   router.post('/analyze-product-image', controller.analyzeProductImage);
