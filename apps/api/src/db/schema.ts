@@ -519,3 +519,36 @@ export const agentMessages = pgTable(
     conversationIdx: index('agent_messages_conversation_idx').on(table.conversationId, table.createdAt),
   }),
 );
+
+export const userPreferences = pgTable(
+  'user_preferences',
+  {
+    userId: uuid('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    language: varchar('language', { length: 10 }),
+    appearance: varchar('appearance', { length: 20 }),
+    defaultAiModel: varchar('default_ai_model', { length: 200 }),
+    aiStrategy: varchar('ai_strategy', { length: 20 }),
+    defaultVideoDuration: integer('default_video_duration'),
+    defaultAspectRatio: varchar('default_aspect_ratio', { length: 10 }),
+    defaultResolution: varchar('default_resolution', { length: 10 }),
+    defaultVideoLanguage: varchar('default_video_language', { length: 10 }),
+    notifications: jsonb('notifications').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
+export const workspaceSettings = pgTable(
+  'workspace_settings',
+  {
+    workspaceId: uuid('workspace_id')
+      .primaryKey()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    defaultAiModel: varchar('default_ai_model', { length: 200 }),
+    aiStrategy: varchar('ai_strategy', { length: 20 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+);

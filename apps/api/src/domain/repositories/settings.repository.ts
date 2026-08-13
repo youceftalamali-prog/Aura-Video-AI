@@ -36,4 +36,8 @@ export class SettingsRepository {
       description: r.description,
     }));
   }
+
+  async delete(key: string): Promise<void> {
+    await this.db.delete(settings).where(eq(settings.key, key));
+  }
 }

@@ -114,6 +114,13 @@ export class AIGateway implements IAIProvider {
     return this.models.list();
   }
 
+  /** Forces a catalog refresh and returns the fresh model list (admin action). */
+  async refreshModelsCatalog(): Promise<ModelDescriptor[]> {
+    await this.syncConfiguredProviders();
+    await this.models.refresh();
+    return this.models.list();
+  }
+
   /** Registry availability + model cache status (admin listing). */
   async getRegistryStatus(): Promise<{
     providers: Record<string, ProviderAvailability>;

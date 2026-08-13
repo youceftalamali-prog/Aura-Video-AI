@@ -13,6 +13,7 @@ const NAV = [
   { to: '/templates', key: 'nav.templates' },
   { to: '/library', key: 'nav.library' },
   { to: '/billing', key: 'nav.billing' },
+  { to: '/settings', key: 'nav.settings' },
 ] as const;
 
 export function AppShell({ children, title }: { children: React.ReactNode; title?: string }) {

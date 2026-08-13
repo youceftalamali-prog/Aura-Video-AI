@@ -3,12 +3,20 @@ import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import type { UserRepository } from '../../../domain/repositories/user.repository.js';
 import type { SettingsRepository } from '../../../domain/repositories/settings.repository.js';
 import type { ApiResponse } from '@aura/types';
+import { FEATURE_FLAG_KEY_PATTERN, FEATURE_FLAG_PREFIX } from '@aura/types';
 import type { AIGateway } from '../../../modules/ai/gateway/ai-gateway.js';
 import { CONFIGURABLE_PROVIDERS, type ProviderConfigService } from '../../../modules/ai/services/provider-config.service.js';
 import {
   createProviderConfigSchema,
   updateProviderConfigSchema,
 } from '../../../modules/ai/dto/provider-config.schemas.js';
+
+export interface FeatureFlagValue {
+  enabled: boolean;
+  description?: string;
+}
+
+const FEATURE_FLAG_KEY_MAX_LENGTH = 100;
 
 export class AdminController {
   constructor(
@@ -218,6 +226,161 @@ export class AdminController {
       }
       const result = await this.providerConfigs.test(id);
       res.status(200).json({ success: true, data: result } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listAiModels = async (
+    _req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const models = await this.aiGateway.listModels();
+      const safe = models.map((model) => ({
+        id: model.id,
+        displayName: model.displayName ?? model.id,
+        providerId: model.provider,
+        capabilities: model.capabilities,
+        contextLength: model.contextWindow ?? null,
+        supportsVision: model.supportsVision ?? false,
+        pricing:
+          model.promptPrice !== undefined || model.completionPrice !== undefined
+            ? { prompt: model.promptPrice ?? null, completion: model.completionPrice ?? null }
+            : null,
+        source: model.source,
+        isDefault: model.isDefault ?? false,
+      }));
+      res.status(200).json({ success: true, data: safe } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  refreshAiModels = async (
+    _req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const models = await this.aiGateway.refreshModelsCatalog();
+      res.status(200).json({
+        success: true,
+        data: {
+          count: models.length,
+          models: models.map((model) => ({
+            id: model.id,
+            displayName: model.displayName ?? model.id,
+            providerId: model.provider,
+            source: model.source,
+          })),
+        },
+      } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listFeatureFlags = async (
+    _req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const rows = await this.settingsRepo.list();
+      const flags = rows
+        .filter((row) => row.key.startsWith(FEATURE_FLAG_PREFIX))
+        .map((row) => {
+          const value = (row.value ?? {}) as Partial<FeatureFlagValue>;
+          return {
+            key: row.key,
+            enabled: value.enabled === true,
+            description: row.description ?? value.description ?? null,
+          };
+        });
+      res.status(200).json({ success: true, data: flags } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateFeatureFlag = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { key } = req.params;
+      if (!key || key.length > FEATURE_FLAG_KEY_MAX_LENGTH || !FEATURE_FLAG_KEY_PATTERN.test(key)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Invalid feature flag key' },
+        });
+        return;
+      }
+      const { enabled, description } = req.body as { enabled?: boolean; description?: string };
+      const value: FeatureFlagValue = {
+        enabled: enabled === true,
+        description: description ?? undefined,
+      };
+      await this.settingsRepo.set(key, value, description);
+      res.status(200).json({ success: true, data: { key, enabled: value.enabled, description: value.description ?? null } } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  deleteFeatureFlag = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { key } = req.params;
+      if (!key || !key.startsWith(FEATURE_FLAG_PREFIX)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Invalid feature flag key' },
+        });
+        return;
+      }
+      await this.settingsRepo.delete(key);
+      res.status(200).json({ success: true } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getSystemHealth = async (
+    _req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const [registry, settingsRows] = await Promise.all([
+        this.aiGateway.getRegistryStatus(),
+        this.settingsRepo.list(),
+      ]);
+      const flags = settingsRows.filter((row) => row.key.startsWith(FEATURE_FLAG_PREFIX)).length;
+      const providerAvailabilities = Object.fromEntries(
+        Object.entries(registry.providers).map(([name, availability]) => [name, String(availability)]),
+      );
+      res.status(200).json({
+        success: true,
+        data: {
+          providers: providerAvailabilities,
+          models: {
+            loaded: registry.models.loaded,
+            catalogCount: registry.models.catalogCount,
+            seededCount: registry.models.staticCount,
+            refreshedAt: registry.models.refreshedAt,
+          },
+          featureFlagsCount: flags,
+          settingsCount: settingsRows.length,
+          timestamp: new Date().toISOString(),
+        },
+      } satisfies ApiResponse);
     } catch (err) {
       next(err);
     }

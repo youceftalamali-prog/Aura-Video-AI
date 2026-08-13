@@ -17,3 +17,4 @@ export * from './product-intelligence';
 export * from './publishing';
 export * from './template-library';
 export * from './language';
+export * from './settings';

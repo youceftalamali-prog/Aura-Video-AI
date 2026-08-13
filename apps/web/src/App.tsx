@@ -13,6 +13,7 @@ import { TemplateCategoryPage } from './pages/TemplateCategoryPage';
 import { TemplateDetailPage } from './pages/TemplateDetailPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { BillingPage } from './pages/BillingPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { BillingSuccessPage } from './pages/BillingSuccessPage';
 import { BillingCancelPage } from './pages/BillingCancelPage';
 import { getAccessToken } from './lib/api';
@@ -120,6 +121,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <BillingPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
           </ProtectedRoute>
         }
       />

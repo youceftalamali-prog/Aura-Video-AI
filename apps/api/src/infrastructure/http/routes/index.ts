@@ -16,6 +16,7 @@ import { createPublishingModule } from '../../../modules/publishing/index.js';
 import { createTemplatesModule } from '../../../modules/templates/index.js';
 import { createLibraryModule } from '../../../modules/library/index.js';
 import { createBillingModule } from '../../../modules/billing/index.js';
+import { createSettingsModule } from '../../../modules/settings/index.js';
 
 export function createApiRouter(deps: {
   authController: AuthController;
@@ -34,6 +35,7 @@ export function createApiRouter(deps: {
   const templatesModule = createTemplatesModule();
   const libraryModule = createLibraryModule();
   const billingModule = createBillingModule();
+  const settingsModule = createSettingsModule();
 
   router.get('/health', deps.healthController.check);
   router.use('/auth', createAuthRoutes(deps.authController));
@@ -49,6 +51,7 @@ export function createApiRouter(deps: {
   router.use('/templates', templatesModule.routes);
   router.use('/library', libraryModule.routes);
   router.use('/billing', billingModule.routes);
+  router.use('/settings', settingsModule.routes);
 
   return router;
 }

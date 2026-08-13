@@ -31,7 +31,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                 Plans
               </Link>
               <Link to="/settings" className="text-slate-600 hover:text-slate-900">
-                Settings
+                Developer Settings
               </Link>
             </nav>
           </div>

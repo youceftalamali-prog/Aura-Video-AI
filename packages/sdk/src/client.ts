@@ -59,6 +59,11 @@ import type {
   CreateProjectInput,
   UpdateProjectInput,
   Asset,
+  UserSettingsPayload,
+  UpdateUserPreferencesInput,
+  WorkspaceSettingsPayload,
+  UpdateWorkspaceSettingsInput,
+  AiModelOption,
 } from '@aura/types';
 
 export interface AuraClientOptions {
@@ -135,6 +140,10 @@ export class AuraClient {
 
   async updatePreferredLanguage(language: string): Promise<{ user: PublicUser }> {
     return this.request('PATCH', '/api/v1/auth/me/language', { language });
+  }
+
+  async listAiModels(): Promise<AiModelOption[]> {
+    return this.request<AiModelOption[]>('GET', '/api/v1/ai/models');
   }
 
   async me(): Promise<PublicUser> {
@@ -473,5 +482,22 @@ export class AuraClient {
 
   async cancelSubscription(): Promise<{ status: string; cancelAtPeriodEnd: boolean }> {
     return this.request('POST', '/api/v1/billing/subscription/cancel');
+  }
+
+  async getUserSettings(): Promise<UserSettingsPayload> {
+    return this.request<UserSettingsPayload>('GET', '/api/v1/settings/user');
+  }
+
+  async updateUserSettings(input: UpdateUserPreferencesInput): Promise<UserSettingsPayload> {
+    return this.request<UserSettingsPayload>('PATCH', '/api/v1/settings/user', input);
+  }
+
+  async getSettingsWorkspace(workspaceId?: string): Promise<WorkspaceSettingsPayload> {
+    const qs = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+    return this.request<WorkspaceSettingsPayload>('GET', `/api/v1/settings/workspace${qs}`);
+  }
+
+  async updateSettingsWorkspace(input: UpdateWorkspaceSettingsInput & { workspaceId?: string }): Promise<WorkspaceSettingsPayload> {
+    return this.request<WorkspaceSettingsPayload>('PATCH', '/api/v1/settings/workspace', input);
   }
 }

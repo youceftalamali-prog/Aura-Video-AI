@@ -11,6 +11,7 @@ const NAV = [
   { to: '/products', key: 'nav.products', icon: '◫' },
   { to: '/video', key: 'nav.video', icon: '◇' },
   { to: '/billing', key: 'nav.billing', icon: '◆' },
+  { to: '/settings', key: 'nav.settings', icon: '⚙' },
 ] as const;
 
 export function AuraNav() {
