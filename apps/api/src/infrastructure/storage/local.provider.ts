@@ -1,16 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { getEnv } from '@aura/config';
 import type { IStorageProvider, StorageObject, StorageUploadOptions } from './types.js';
+import { getEnv } from '@aura/config';
+import { buildLocalStorageUrl, verifyStorageToken } from './local-signing.js';
 
 export class LocalStorageProvider implements IStorageProvider {
-  private basePath: string;
-  private publicBaseUrl: string;
+  private readonly basePath: string;
 
   constructor() {
     const env = getEnv();
     this.basePath = path.resolve(env.LOCAL_STORAGE_PATH);
-    this.publicBaseUrl = `${env.API_URL}/storage`;
   }
 
   private resolvePath(key: string): string {
@@ -18,11 +17,11 @@ export class LocalStorageProvider implements IStorageProvider {
       throw new Error('Invalid storage key');
     }
     const segments = key.split('/');
-    if (segments.some((s) => s === '' || s === '.' || s === '..')) {
+    if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
       throw new Error('Invalid storage key');
     }
     const full = path.join(this.basePath, ...segments);
-    const base = this.basePath.endsWith(path.sep) ? this.basePath : this.basePath + path.sep;
+    const base = this.basePath.endsWith(path.sep) ? this.basePath : `${this.basePath}${path.sep}`;
     if (full !== this.basePath && !full.startsWith(base)) {
       throw new Error('Invalid storage key');
     }
@@ -35,7 +34,8 @@ export class LocalStorageProvider implements IStorageProvider {
     await fs.writeFile(fullPath, options.body);
     return {
       key: options.key,
-      url: `${this.publicBaseUrl}/${options.key}`,
+      url: await this.getSignedUrl(options.key),
+      size: Buffer.byteLength(options.body),
       contentType: options.contentType,
     };
   }
@@ -45,14 +45,26 @@ export class LocalStorageProvider implements IStorageProvider {
     try {
       await fs.unlink(fullPath);
     } catch (err: unknown) {
-      if ((err as unknown as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw err;
-      }
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
   }
 
-  async getSignedUrl(key: string, _expiresInSeconds = 3600): Promise<string> {
-    return `${this.publicBaseUrl}/${key}`;
+  async getSignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
+    this.resolvePath(key);
+    return buildLocalStorageUrl(key, expiresInSeconds);
+  }
+
+  getFilePath(key: string): string {
+    return this.resolvePath(key);
+  }
+
+  verifySignedUrl(key: string, token: string): boolean {
+    try {
+      this.resolvePath(key);
+      return verifyStorageToken(key, token);
+    } catch {
+      return false;
+    }
   }
 
   async exists(key: string): Promise<boolean> {
