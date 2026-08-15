@@ -45,19 +45,21 @@ export interface AnalyzeProductTextInput {
   name: string;
   description: string;
   metadata?: Record<string, unknown>;
-
   language?: string;
   contentLanguage?: string;
   videoLanguage?: string;
-  aiOutputLanguage?: string;}
+  aiOutputLanguage?: string;
+  strategy?: RoutingStrategy;
+}
 
 export interface AnalyzeProductUrlInput {
   url: string;
-
   language?: string;
   contentLanguage?: string;
   videoLanguage?: string;
-  aiOutputLanguage?: string;}
+  aiOutputLanguage?: string;
+  strategy?: RoutingStrategy;
+}
 
 export interface AnalyzeProductImageInput {
   imageUrl?: string;
@@ -65,11 +67,12 @@ export interface AnalyzeProductImageInput {
   mimeType?: string;
   name?: string;
   description?: string;
-
   language?: string;
   contentLanguage?: string;
   videoLanguage?: string;
-  aiOutputLanguage?: string;}
+  aiOutputLanguage?: string;
+  strategy?: RoutingStrategy;
+}
 
 export interface AIAssistantInput {
   message: string;
@@ -79,6 +82,7 @@ export interface AIAssistantInput {
   contentLanguage?: string;
   videoLanguage?: string;
   aiOutputLanguage?: string;
+  strategy?: RoutingStrategy;
 }
 
 export interface AIIntent {

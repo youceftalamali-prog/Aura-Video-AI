@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const routingStrategySchema = z.enum(['fast', 'balanced', 'smart']);
+
 export const productAnalysisSchema = z.object({
   productName: z.string().min(1).max(300),
   shortDescription: z.string().min(1).max(500),
@@ -26,6 +28,7 @@ export const analyzeProductTextBodySchema = z.object({
   name: z.string().min(1).max(300).trim(),
   description: z.string().min(1).max(8000).trim(),
   metadata: z.record(z.unknown()).optional(),
+  strategy: routingStrategySchema.optional(),
 });
 
 export const analyzeProductUrlBodySchema = z.object({
@@ -41,6 +44,7 @@ export const analyzeProductUrlBodySchema = z.object({
         return false;
       }
     }, 'Only http/https URLs are allowed'),
+  strategy: routingStrategySchema.optional(),
 });
 
 export const analyzeProductImageBodySchema = z
@@ -50,6 +54,7 @@ export const analyzeProductImageBodySchema = z
     mimeType: z.string().max(100).optional(),
     name: z.string().max(300).optional(),
     description: z.string().max(8000).optional(),
+    strategy: routingStrategySchema.optional(),
   })
   .refine((d) => !!d.imageUrl || !!d.imageBase64, {
     message: 'Either imageUrl or imageBase64 is required',
@@ -60,6 +65,7 @@ export const aiAssistantBodySchema = z.object({
   productId: z.string().uuid().optional(),
   productAnalysis: productAnalysisSchema.optional(),
   language: z.string().max(20).optional(),
+  strategy: routingStrategySchema.optional(),
 });
 
 export const aiIntentSchema = z.object({
