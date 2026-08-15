@@ -15,7 +15,7 @@ Phase 18 makes the generated video asset the canonical project output and remove
 - Updated project reads to resolve a fresh signed URL from the canonical asset only when the asset is ready, belongs to the same workspace, and exists in storage.
 - Removed the unused internal path that could write a project video URL directly.
 - Added deterministic API-boundary checks preventing clients from setting `videoUrl`, `videoAssetId`, completed status, or arbitrary server-owned fields.
-- Extended the runtime gate to verify `projects.video_asset_id`.
+- Extended the runtime gate to verify the column, foreign key, and stale project-URL cleanup.
 
 ### Checks
 
@@ -26,4 +26,4 @@ pnpm typecheck
 pnpm build
 ```
 
-The deterministic suite proves request-boundary behavior. The runtime suite proves the migration and column only when it is run against a real PostgreSQL instance.
+The deterministic suite proves request-boundary behavior. The runtime suite proves the migration, relation, and cleanup only when it is run against a real PostgreSQL instance.
