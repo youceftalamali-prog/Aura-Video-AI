@@ -20,6 +20,7 @@ export function createAdminRoutes(controller: AdminController): Router {
 
   router.get('/ai/models', controller.listAiModels);
   router.post('/ai/models/refresh', controller.refreshAiModels);
+  router.put('/ai/models/allowlist', controller.updateAiModelAllowlist);
 
   router.get('/feature-flags', controller.listFeatureFlags);
   router.put('/feature-flags/:key', controller.updateFeatureFlag);
