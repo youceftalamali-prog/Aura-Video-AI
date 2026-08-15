@@ -5,6 +5,10 @@ import { TokenCryptoService } from '../../publishing/services/token-crypto.servi
 import { OpenAIProvider } from '../providers/openai.provider.js';
 import { OpenRouterProvider } from '../providers/openrouter.provider.js';
 import { DbProviderConfigRepository, type ProviderConfigRepository } from '../repositories/provider-config.repository.js';
+import {
+  DbModelAllowlistRepository,
+  type ModelAllowlistRepository,
+} from '../repositories/model-allowlist.repository.js';
 import { ProviderConfigService } from '../services/provider-config.service.js';
 import { AIGateway } from './ai-gateway.js';
 import { ModelRegistry } from './model-registry.js';
@@ -19,6 +23,7 @@ let gatewayDeps: AIGatewayDeps | null = null;
 export interface AIGatewayDeps {
   configService?: ProviderConfigService;
   repo?: ProviderConfigRepository;
+  allowlistRepo?: ModelAllowlistRepository;
 }
 
 export function createAIGateway(deps: AIGatewayDeps = {}): AIGateway {
@@ -30,6 +35,9 @@ export function createAIGateway(deps: AIGatewayDeps = {}): AIGateway {
   const configService =
     deps.configService ??
     new ProviderConfigService(deps.repo ?? new DbProviderConfigRepository(getDb()), new TokenCryptoService());
+  const allowlistRepo =
+    deps.allowlistRepo ??
+    (deps.configService || deps.repo ? null : new DbModelAllowlistRepository(getDb()));
 
   const providers = new ProviderRegistry();
   providers.register(new OpenAIProviderAdapter(new OpenAIProvider()), true);
@@ -68,7 +76,7 @@ export function createAIGateway(deps: AIGatewayDeps = {}): AIGateway {
   }
 
   const resolver = new RoutingResolver(providers, models, env.OPENROUTER_DEFAULT_MODEL || env.AI_MODEL);
-  aiGateway = new AIGateway(providers, resolver, models, configService);
+  aiGateway = new AIGateway(providers, resolver, models, configService, allowlistRepo);
   return aiGateway;
 }
 
