@@ -238,7 +238,10 @@ export class VideoGenerationService {
         })),
       });
 
-      const assetId = await this.persistLocalVideo(job, composed.localPath);
+      const assetId = await this.persistLocalVideo(job, composed.localPath, {
+        durationSeconds: input.duration,
+        resolution: input.aspectRatio,
+      });
 
       await this.jobs.update(jobId, {
         status: 'completed',
@@ -335,7 +338,8 @@ export class VideoGenerationService {
   private async persistLocalVideo(
     job: { id: string; workspaceId: string; userId: string; projectId: string },
     localPath: string,
-  ): Promise<string | null> {
+    metadata: { durationSeconds?: number; resolution?: string },
+  ): Promise<string> {
     try {
       const storage = getStorageProvider();
       const key = `videos/${job.workspaceId}/${job.id}.mp4`;
@@ -361,9 +365,28 @@ export class VideoGenerationService {
           metadata: { jobId: job.id, projectId: job.projectId, source: 'video_generation' },
         })
         .returning();
-      await this.jobs.update(job.id, { outputUrl: uploaded.url, assetId: rows[0]?.id ?? null });
-      return rows[0]?.id ?? null;
+      const asset = rows[0];
+      if (!asset) throw new AppError('Video asset could not be persisted', 500, 'VIDEO_STORAGE_FAILED');
+
+      const projectRows = await this.db
+        .update(projects)
+        .set({
+          videoAssetId: asset.id,
+          videoUrl: null,
+          status: 'completed',
+          durationSeconds: metadata.durationSeconds ?? null,
+          resolution: metadata.resolution ?? null,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(projects.id, job.projectId), eq(projects.workspaceId, job.workspaceId)))
+        .returning({ id: projects.id });
+      if (!projectRows[0]) throw new AppError('Project video link could not be persisted', 500, 'VIDEO_PROJECT_LINK_FAILED');
+
+      await this.jobs.update(job.id, { outputUrl: null, assetId: asset.id });
+      return asset.id;
     } catch (err) {
+      if (err instanceof AppError) throw err;
       throw new AppError(`Video storage failed: ${(err as unknown as Error).message}`, 500, 'VIDEO_STORAGE_FAILED');
     }
   }
