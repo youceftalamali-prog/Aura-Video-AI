@@ -25,6 +25,7 @@ function logEvent(event: string, payload: Record<string, unknown>): void {
 }
 
 const ACTIVE: VideoJobStatus[] = ['queued', 'processing', 'composing', 'rendering'];
+const DEFAULT_LEASE_OWNER = `inline:${process.pid}`;
 
 export class VideoGenerationService {
   private readonly credits: CreditLedgerService;
@@ -139,14 +140,14 @@ export class VideoGenerationService {
       const redis = getRedis();
       await redis.lpush('aura:video:jobs', job.id);
     } catch {
-      // Redis optional for queue fan-out; in-process still runs
+      // Redis optional for queue fan-out; the database worker can recover queued jobs
     }
 
     return { jobId: job.id, status: 'queued', creditsCharged: estimate.credits };
   }
 
-  async processJob(jobId: string): Promise<void> {
-    const job = await this.jobs.claimQueued(jobId);
+  async processJob(jobId: string, leaseOwner = DEFAULT_LEASE_OWNER): Promise<void> {
+    const job = await this.jobs.claimQueued(jobId, leaseOwner);
     if (!job) return;
 
     const input = job.input as {
@@ -177,12 +178,17 @@ export class VideoGenerationService {
         currentStage: 'provider_processing',
         progress: 15,
       });
-      logEvent('generation_submitted', { jobId, providerJobId: submitted.providerJobId });
+      logEvent('generation_submitted', { jobId, providerJobId: submitted.providerJobId, leaseOwner });
 
       const maxAttempts = 60;
       let remoteUrl: string | null = null;
       for (let i = 0; i < maxAttempts; i++) {
         await sleep(5000);
+        if (!(await this.jobs.heartbeat(jobId, leaseOwner))) {
+          logEvent('generation_lease_lost', { jobId, leaseOwner });
+          return;
+        }
+
         const current = await this.jobs.findById(jobId);
         if (!current || current.status === 'canceled') return;
 
@@ -221,6 +227,10 @@ export class VideoGenerationService {
         throw new AppError('Video generation timed out', 504, 'VIDEO_GENERATION_TIMEOUT');
       }
 
+      if (!(await this.jobs.heartbeat(jobId, leaseOwner))) {
+        logEvent('generation_lease_lost_before_composition', { jobId, leaseOwner });
+        return;
+      }
       await this.jobs.update(jobId, { status: 'composing', currentStage: 'composing', progress: 75 });
       logEvent('generation_processing', { jobId, stage: 'composing' });
 
@@ -254,7 +264,7 @@ export class VideoGenerationService {
       await fs.unlink(localProviderPath).catch(() => undefined);
       await fs.unlink(composed.localPath).catch(() => undefined);
 
-      logEvent('generation_completed', { jobId, assetId });
+      logEvent('generation_completed', { jobId, assetId, leaseOwner });
     } catch (err) {
       const message = err instanceof AppError ? err.message : (err as unknown as Error).message;
       await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, message, job.userId);
