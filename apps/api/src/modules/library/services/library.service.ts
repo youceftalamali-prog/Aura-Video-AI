@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { AppError, NotFoundError } from '@aura/shared';
 import type { Asset, CreateProjectInput, Project, UpdateProjectInput } from '@aura/types';
 import type { Database } from '../../../db/client.js';
-import { products, templates } from '../../../db/schema.js';
+import { assets, products, templates } from '../../../db/schema.js';
 import type { ProjectRepository } from '../../../domain/repositories/project.repository.js';
 import type { AssetRepository } from '../../../domain/repositories/asset.repository.js';
 import type { WorkspaceRepository } from '../../../domain/repositories/workspace.repository.js';
@@ -23,13 +23,14 @@ export class LibraryService {
   }
 
   async listProjects(userId: string): Promise<Project[]> {
-    return this.projects.listByUser(userId);
+    const projects = await this.projects.listByUser(userId);
+    return Promise.all(projects.map((project) => this.withFreshProjectVideoUrl(project)));
   }
 
   async getProject(userId: string, id: string): Promise<Project> {
     const project = await this.projects.findByIdForUser(id, userId);
     if (!project) throw new NotFoundError('Project');
-    return project;
+    return this.withFreshProjectVideoUrl(project);
   }
 
   async createProject(userId: string, input: Omit<CreateProjectInput, 'workspaceId'>): Promise<Project> {
@@ -41,7 +42,7 @@ export class LibraryService {
   async updateProject(userId: string, id: string, input: UpdateProjectInput): Promise<Project> {
     const updated = await this.projects.update(id, userId, input);
     if (!updated) throw new NotFoundError('Project');
-    return updated;
+    return this.withFreshProjectVideoUrl(updated);
   }
 
   async deleteProject(userId: string, id: string): Promise<void> {
@@ -127,6 +128,37 @@ export class LibraryService {
     }
   }
 
+  private async withFreshProjectVideoUrl(project: Project): Promise<Project> {
+    // A project never exposes its persisted video_url. The canonical asset
+    // relation is checked for workspace ownership and converted to a fresh
+    // signed URL only when the object is still ready and present.
+    if (!project.videoAssetId) return { ...project, videoUrl: null };
+
+    try {
+      const rows = await this.db
+        .select({
+          storageKey: assets.storageKey,
+          status: assets.status,
+          workspaceId: assets.workspaceId,
+        })
+        .from(assets)
+        .where(and(
+          eq(assets.id, project.videoAssetId),
+          eq(assets.workspaceId, project.workspaceId),
+        ))
+        .limit(1);
+      const asset = rows[0];
+      if (!asset || asset.status !== 'ready') return { ...project, videoUrl: null };
+
+      const storage = getStorageProvider();
+      if (!(await storage.exists(asset.storageKey))) return { ...project, videoUrl: null };
+      return { ...project, videoUrl: await storage.getSignedUrl(asset.storageKey, 3600) };
+    } catch {
+      // A library read must never fall back to a stale persisted URL.
+      return { ...project, videoUrl: null };
+    }
+  }
+
   private async withSignedUrl(asset: Asset): Promise<Asset> {
     if (asset.status !== 'ready' || !asset.storageKey) return { ...asset, url: '' };
     const storage = getStorageProvider();
@@ -151,20 +183,5 @@ export class LibraryService {
             ? 'jpg'
             : 'bin';
     return `aura-video-${base}.${ext}`;
-  }
-
-  async attachVideoToProject(
-    userId: string,
-    projectId: string,
-    videoUrl: string,
-    opts?: { durationSeconds?: number; resolution?: string; thumbnailUrl?: string },
-  ): Promise<Project> {
-    return this.updateProject(userId, projectId, {
-      videoUrl,
-      status: 'completed',
-      durationSeconds: opts?.durationSeconds ?? null,
-      resolution: opts?.resolution ?? null,
-      thumbnailUrl: opts?.thumbnailUrl ?? null,
-    });
   }
 }
