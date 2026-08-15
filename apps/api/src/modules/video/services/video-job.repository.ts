@@ -38,6 +38,20 @@ export class VideoJobRepository {
     return this.map(rows[0]!);
   }
 
+  async claimQueued(id: string): Promise<VideoGenerationJob | null> {
+    const rows = await this.db
+      .update(videoGenerationJobs)
+      .set({
+        status: 'processing',
+        currentStage: 'provider_submit',
+        progress: 5,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(videoGenerationJobs.id, id), eq(videoGenerationJobs.status, 'queued')))
+      .returning();
+    return rows[0] ? this.map(rows[0]) : null;
+  }
+
   async findByIdempotency(workspaceId: string, key: string): Promise<VideoGenerationJob | null> {
     const rows = await this.db
       .select()

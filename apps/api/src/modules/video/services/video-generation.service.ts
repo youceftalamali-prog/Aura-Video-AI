@@ -150,11 +150,8 @@ export class VideoGenerationService {
   }
 
   async processJob(jobId: string): Promise<void> {
-    const job = await this.jobs.findById(jobId);
+    const job = await this.jobs.claimQueued(jobId);
     if (!job) return;
-    if (!ACTIVE.includes(job.status) && job.status !== 'queued') {
-      return;
-    }
 
     const input = job.input as {
       aspectRatio: VideoGenerationRequest['aspectRatio'];
@@ -166,8 +163,6 @@ export class VideoGenerationService {
     };
 
     try {
-      await this.jobs.update(jobId, { status: 'processing', currentStage: 'provider_submit', progress: 5 });
-
       const prompt = job.prompt || input.scenes.map((s) => s.visualPrompt).join('\n');
       const submitted = await this.media.generateVideo({
         prompt,
