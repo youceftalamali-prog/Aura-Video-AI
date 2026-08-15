@@ -12,6 +12,8 @@ export interface Project extends Timestamps {
   templateId: UUID | null;
   productId: UUID | null;
   thumbnailUrl: string | null;
+  /** Canonical link to the generated video asset; videoUrl is response-only and signed. */
+  videoAssetId: UUID | null;
   videoUrl: string | null;
   durationSeconds: number | null;
   resolution: string | null;
