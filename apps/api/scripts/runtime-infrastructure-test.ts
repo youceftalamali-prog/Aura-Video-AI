@@ -89,6 +89,28 @@ async function main(): Promise<void> {
     );
     check('Projects canonical video_asset_id column exists', projectColumns.rows.length === 1);
 
+    const projectForeignKey = await pool.query<{ constraint_name: string }>(
+      `SELECT tc.constraint_name
+       FROM information_schema.table_constraints tc
+       JOIN information_schema.constraint_column_usage ccu
+         ON ccu.constraint_name = tc.constraint_name
+        AND ccu.table_schema = tc.constraint_schema
+       WHERE tc.table_schema = 'public'
+         AND tc.table_name = 'projects'
+         AND tc.constraint_type = 'FOREIGN KEY'
+         AND tc.constraint_name = 'projects_video_asset_id_assets_id_fk'
+         AND ccu.table_name = 'assets'
+         AND ccu.column_name = 'id'`,
+    );
+    check('Projects video asset foreign key exists', projectForeignKey.rows.length === 1);
+
+    const staleProjectUrls = await pool.query<{ count: number }>(
+      `SELECT count(*)::int AS count
+       FROM projects
+       WHERE video_url IS NOT NULL`,
+    );
+    check('No persisted project video URLs remain', staleProjectUrls.rows[0]?.count === 0);
+
     console.log('Scenario 2: Redis connectivity and read/write round trip');
     await redis.connect();
     check('Redis responds to PING', (await redis.ping()) === 'PONG');
