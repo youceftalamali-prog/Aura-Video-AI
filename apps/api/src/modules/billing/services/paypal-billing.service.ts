@@ -72,13 +72,28 @@ export class PayPalBillingService {
   }
 
   listCreditPackages() {
-    return (Object.keys(CREDIT_PACKAGES) as unknown as CreditPackageKey[]).map((key) => ({
-      key,
-      ...CREDIT_PACKAGES[key],
-      priceConfigured: isPayPalConfigured(),
-      value: creditPackageValue(key).value,
-      currency: creditPackageValue(key).currency,
-    }));
+    return (Object.keys(CREDIT_PACKAGES) as unknown as CreditPackageKey[]).map((key) => {
+      // Pricing is optional for the visibility page. Do not make GET /overview
+      // fail merely because checkout secrets or package prices are absent.
+      try {
+        const pricing = creditPackageValue(key);
+        return {
+          key,
+          ...CREDIT_PACKAGES[key],
+          priceConfigured: true,
+          value: pricing.value,
+          currency: pricing.currency,
+        };
+      } catch {
+        return {
+          key,
+          ...CREDIT_PACKAGES[key],
+          priceConfigured: false,
+          value: null,
+          currency: null,
+        };
+      }
+    });
   }
 
   getClientId(): string | null {
@@ -120,11 +135,7 @@ export class PayPalBillingService {
           cancel_url: env.PAYPAL_CANCEL_URL,
         },
       });
-      return {
-        checkoutUrl: approveUrl(sub.links),
-        sessionId: sub.id,
-        provider: 'paypal' as const,
-      };
+      return { checkoutUrl: approveUrl(sub.links), sessionId: sub.id, provider: 'paypal' as const };
     } catch (err) {
       if (err instanceof AppError) throw err;
       throw new AppError(`PayPal subscription failed: ${(err as unknown as Error).message}`, 502, 'PAYPAL_CHECKOUT_FAILED');
@@ -142,13 +153,11 @@ export class PayPalBillingService {
     try {
       const order = await paypalRequest<PayPalOrder>('POST', '/v2/checkout/orders', {
         intent: 'CAPTURE',
-        purchase_units: [
-          {
-            amount: { currency_code: currency, value },
-            description: `Aura Video AI credits pack: ${pkg} (${credits} credits)`,
-            custom_id: `${ws.id}|${userId}|credits|${pkg}|${credits}`,
-          },
-        ],
+        purchase_units: [{
+          amount: { currency_code: currency, value },
+          description: `Aura Video AI credits pack: ${pkg} (${credits} credits)`,
+          custom_id: `${ws.id}|${userId}|credits|${pkg}|${credits}`,
+        }],
         application_context: {
           brand_name: 'Aura Video AI',
           user_action: 'PAY_NOW',
@@ -156,11 +165,7 @@ export class PayPalBillingService {
           cancel_url: env.PAYPAL_CANCEL_URL,
         },
       });
-      return {
-        checkoutUrl: approveUrl(order.links),
-        sessionId: order.id,
-        provider: 'paypal' as const,
-      };
+      return { checkoutUrl: approveUrl(order.links), sessionId: order.id, provider: 'paypal' as const };
     } catch (err) {
       if (err instanceof AppError) throw err;
       throw new AppError(`PayPal order failed: ${(err as unknown as Error).message}`, 502, 'PAYPAL_CHECKOUT_FAILED');
@@ -191,12 +196,7 @@ export class PayPalBillingService {
     });
     await this.db
       .update(subscriptions)
-      .set({
-        cancelAtPeriodEnd: false,
-        status: 'canceled',
-        canceledAt: new Date(),
-        updatedAt: new Date(),
-      })
+      .set({ cancelAtPeriodEnd: false, status: 'canceled', canceledAt: new Date(), updatedAt: new Date() })
       .where(eq(subscriptions.id, sub.id));
     return { status: 'canceled', cancelAtPeriodEnd: false, canceledAt: new Date().toISOString() };
   }
@@ -226,8 +226,7 @@ export class PayPalBillingService {
         externalId: null,
       };
     }
-    const planKey =
-      (Object.keys(PLAN_IDS) as PlanKey[]).find((k) => PLAN_IDS[k] === sub.planId) || null;
+    const planKey = (Object.keys(PLAN_IDS) as PlanKey[]).find((k) => PLAN_IDS[k] === sub.planId) || null;
     return {
       plan: planKey,
       planId: sub.planId,
