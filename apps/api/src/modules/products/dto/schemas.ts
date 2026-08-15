@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
+export const routingStrategySchema = z.enum(['fast', 'balanced', 'smart']);
+
 export const importUrlSchema = z.object({
   url: z.string().url().max(2048),
+  strategy: routingStrategySchema.optional(),
 });
 
 export const importTextSchema = z.object({
@@ -10,6 +13,7 @@ export const importTextSchema = z.object({
   price: z.string().max(40).optional(),
   currency: z.string().max(3).optional(),
   brand: z.string().max(100).optional(),
+  strategy: routingStrategySchema.optional(),
 });
 
 export const importImageSchema = z.object({
@@ -18,7 +22,12 @@ export const importImageSchema = z.object({
   mimeType: z.string().max(100).optional(),
   name: z.string().max(200).optional(),
   description: z.string().max(5000).optional(),
+  strategy: routingStrategySchema.optional(),
 }).refine((d) => d.imageUrl || d.imageBase64, { message: 'imageUrl or imageBase64 required' });
+
+export const refreshIntelligenceSchema = z.object({
+  strategy: routingStrategySchema.optional(),
+});
 
 export const createVideoFromProductSchema = z.object({
   productId: z.string().uuid(),
