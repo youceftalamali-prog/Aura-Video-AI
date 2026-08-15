@@ -9,6 +9,7 @@ import { CONFIGURABLE_PROVIDERS, type ProviderConfigService } from '../../../mod
 import {
   createProviderConfigSchema,
   updateProviderConfigSchema,
+  updateModelAllowlistSchema,
 } from '../../../modules/ai/dto/provider-config.schemas.js';
 
 export interface FeatureFlagValue {
@@ -276,6 +277,32 @@ export class AdminController {
             source: model.source,
           })),
         },
+      } satisfies ApiResponse);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateAiModelAllowlist = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const body = updateModelAllowlistSchema.parse(req.body);
+      const models = await this.aiGateway.setAllowedModels(body.providerId, body.modelIds);
+      const selected = models
+        .filter((model) => model.provider === body.providerId)
+        .map((model) => ({
+          id: model.id,
+          displayName: model.displayName ?? model.id,
+          capabilities: model.capabilities,
+          supportsVision: model.supportsVision ?? false,
+          source: model.source,
+        }));
+      res.status(200).json({
+        success: true,
+        data: { providerId: body.providerId, modelIds: selected.map((model) => model.id), models: selected },
       } satisfies ApiResponse);
     } catch (err) {
       next(err);
