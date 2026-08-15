@@ -64,6 +64,13 @@
       "when": 1786803600000,
       "tag": "0008_project_video_asset",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786807500000,
+      "tag": "0009_video_job_leases",
+      "breakpoints": true
     }
   ]
 }
