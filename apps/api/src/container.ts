@@ -14,6 +14,7 @@ import { HealthController } from './infrastructure/http/controllers/health.contr
 import { GoogleOAuthService } from './infrastructure/auth/google-oauth.service.js';
 import { createAIGateway, ProviderConfigService } from './modules/ai/gateway/index.js';
 import { DbProviderConfigRepository } from './modules/ai/repositories/provider-config.repository.js';
+import { DbModelAllowlistRepository } from './modules/ai/repositories/model-allowlist.repository.js';
 import { TokenCryptoService } from './modules/publishing/services/token-crypto.service.js';
 
 export function createContainer() {
@@ -34,7 +35,10 @@ export function createContainer() {
     new DbProviderConfigRepository(db),
     new TokenCryptoService(),
   );
-  const aiGateway = createAIGateway({ configService: providerConfigService });
+  const aiGateway = createAIGateway({
+    configService: providerConfigService,
+    allowlistRepo: new DbModelAllowlistRepository(db),
+  });
 
   const authController = new AuthController(authService, googleOAuthService);
   const dashboardController = new DashboardController(dashboardService);
