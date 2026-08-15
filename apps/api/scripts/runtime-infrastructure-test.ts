@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { Redis } from 'ioredis';
 import { loadEnv } from '@aura/config';
 import * as schema from '../src/db/schema.js';
 import { CreditLedgerService } from '../src/modules/video/services/credit-ledger.service.js';
+import { VideoCompositionService } from '../src/modules/video/services/composition.service.js';
+import { LocalStorageProvider } from '../src/infrastructure/storage/local.provider.js';
 
 const { Pool } = pg;
 
@@ -225,6 +228,49 @@ async function main(): Promise<void> {
     } finally {
       await pool.query('DELETE FROM workspaces WHERE id = $1', [testWorkspaceId]).catch(() => undefined);
       await pool.query('DELETE FROM users WHERE id = $1', [testUserId]).catch(() => undefined);
+    }
+
+    console.log('Scenario 4: local storage signing and FFmpeg smoke output');
+    const storage = new LocalStorageProvider();
+    const storageKey = `runtime-readiness/${process.pid}/probe.bin`;
+    try {
+      const uploaded = await storage.upload({
+        key: storageKey,
+        body: Buffer.from('aura-runtime-storage-probe'),
+        contentType: 'application/octet-stream',
+      });
+      check('local storage writes a probe object', uploaded.key === storageKey && (uploaded.size ?? 0) > 0);
+      check('local storage reports the object as present', await storage.exists(storageKey));
+
+      const firstUrl = await storage.getSignedUrl(storageKey, 3600);
+      const secondUrl = await storage.getSignedUrl(storageKey, 3601);
+      const token = new URL(firstUrl).searchParams.get('token');
+      check('storage signing returns a tokenized URL', Boolean(token));
+      check('storage signing can rotate its expiry', firstUrl !== secondUrl);
+      check('storage token verifies for its original key', Boolean(token && storage.verifySignedUrl(storageKey, token)));
+      check('storage token rejects a different key', Boolean(token && !storage.verifySignedUrl(`${storageKey}.other`, token)));
+
+      await storage.delete(storageKey);
+      check('local storage removes the probe object', !(await storage.exists(storageKey)));
+    } finally {
+      await storage.delete(storageKey).catch(() => undefined);
+    }
+
+    const composition = new VideoCompositionService();
+    let composedPath: string | null = null;
+    try {
+      const result = await composition.compose({
+        aspectRatio: '9:16',
+        outputFileName: `runtime-${process.pid}.mp4`,
+        scenes: [{ order: 1, duration: 1, onScreenText: 'Aura Runtime' }],
+      });
+      composedPath = result.localPath;
+      const stat = await fs.stat(result.localPath);
+      check('FFmpeg creates a non-empty MP4 output', result.mimeType === 'video/mp4' && stat.size > 100);
+    } catch (error) {
+      check('FFmpeg creates a non-empty MP4 output', false, (error as Error).message);
+    } finally {
+      if (composedPath) await fs.unlink(composedPath).catch(() => undefined);
     }
 
     console.log(`Result: ${passed} passed, ${failed} failed`);
