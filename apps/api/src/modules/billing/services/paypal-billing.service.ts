@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import type { Database } from '../../../db/client.js';
 import { subscriptions } from '../../../db/schema.js';
 import { AppError } from '@aura/shared';
@@ -94,11 +94,11 @@ export class PayPalBillingService {
     const planId = paypalPlanId(plan);
     const ws = await this.getWorkspaceForUser(userId);
 
-    // Prevent duplicate ACTIVE subscriptions for the same workspace
     const existing = await this.db
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.workspaceId, ws.id))
+      .orderBy(desc(subscriptions.updatedAt), desc(subscriptions.createdAt))
       .limit(1);
     if (existing[0] && existing[0].status === 'active' && existing[0].externalId) {
       throw new AppError(
@@ -144,10 +144,7 @@ export class PayPalBillingService {
         intent: 'CAPTURE',
         purchase_units: [
           {
-            amount: {
-              currency_code: currency,
-              value,
-            },
+            amount: { currency_code: currency, value },
             description: `Aura Video AI credits pack: ${pkg} (${credits} credits)`,
             custom_id: `${ws.id}|${userId}|credits|${pkg}|${credits}`,
           },
@@ -170,10 +167,6 @@ export class PayPalBillingService {
     }
   }
 
-  /**
-   * Capture a PayPal order after buyer approval (also done via webhook).
-   * Does NOT grant credits — webhook fulfillment is authoritative for grants.
-   */
   async captureOrder(orderId: string): Promise<{ status: string; orderId: string }> {
     requirePayPalConfig();
     const result = await paypalRequest<PayPalOrder>('POST', `/v2/checkout/orders/${orderId}/capture`, {});
@@ -187,15 +180,15 @@ export class PayPalBillingService {
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.workspaceId, ws.id))
+      .orderBy(desc(subscriptions.updatedAt), desc(subscriptions.createdAt))
       .limit(1);
     const sub = subRows[0];
-    if (!sub?.externalId) {
+    if (!sub?.externalId || !['active', 'created', 'approved', 'pending'].includes(sub.status)) {
       throw new AppError('No active PayPal subscription', 404, 'BILLING_CUSTOMER_NOT_FOUND');
     }
     await paypalRequest('POST', `/v1/billing/subscriptions/${sub.externalId}/cancel`, {
       reason: 'User requested cancellation',
     });
-    // PayPal cancel ends the subscription on PayPal side immediately.
     await this.db
       .update(subscriptions)
       .set({
@@ -208,7 +201,6 @@ export class PayPalBillingService {
     return { status: 'canceled', cancelAtPeriodEnd: false, canceledAt: new Date().toISOString() };
   }
 
-  /** PayPal has no generic "portal" — return billing page path for UI compatibility */
   async createPortalSession(_userId: string) {
     requirePayPalConfig();
     return { url: '/billing', provider: 'paypal' as const, note: 'Manage subscriptions from billing page or PayPal account' };
@@ -220,6 +212,7 @@ export class PayPalBillingService {
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.workspaceId, ws.id))
+      .orderBy(desc(subscriptions.updatedAt), desc(subscriptions.createdAt))
       .limit(1);
     const sub = rows[0];
     if (!sub) {
@@ -247,5 +240,4 @@ export class PayPalBillingService {
       includedCredits: planKey ? PLAN_META[planKey].includedCredits : null,
     };
   }
-
 }
