@@ -29,6 +29,13 @@
       "when": 1786616623528,
       "tag": "0003_blue_clea",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786785789000,
+      "tag": "0004_credit_ledger",
+      "breakpoints": true
     }
   ]
 }
