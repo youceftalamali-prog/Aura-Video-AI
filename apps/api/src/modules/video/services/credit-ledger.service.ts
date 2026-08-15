@@ -98,8 +98,8 @@ export class CreditLedgerService {
   ): Promise<number> {
     this.assertAmount(amount);
     const idempotencyKey = options.idempotencyKey ?? `${transactionType}:${workspaceId}:${randomUUID()}`;
-    if (idempotencyKey.length > 255) {
-      throw new AppError('Credit mutation idempotency key is too long', 400, 'INVALID_CREDIT_MUTATION');
+    if (!idempotencyKey.trim() || idempotencyKey.length > 255) {
+      throw new AppError('Credit mutation idempotency key is invalid', 400, 'INVALID_CREDIT_MUTATION');
     }
 
     return this.withTransaction(async (db) => {
@@ -155,6 +155,9 @@ export class CreditLedgerService {
       if (transactionType === 'usage' && Number(wallet.balance) < amount) {
         throw new AppError('Insufficient credits', 402, 'INSUFFICIENT_CREDITS');
       }
+      if (transactionType === 'refund' && Number(wallet.lifetimeUsed) < amount) {
+        throw new AppError('Refund exceeds used credits', 409, 'CREDIT_REFUND_EXCEEDS_USAGE');
+      }
 
       const nextBalance = Number(wallet.balance) + signedAmount;
       const nextLifetimeGranted =
@@ -163,7 +166,7 @@ export class CreditLedgerService {
         transactionType === 'usage'
           ? Number(wallet.lifetimeUsed) + amount
           : transactionType === 'refund'
-            ? Math.max(0, Number(wallet.lifetimeUsed) - amount)
+            ? Number(wallet.lifetimeUsed) - amount
             : Number(wallet.lifetimeUsed);
 
       const updatedRows = this.rows<{ balance: number }>(await db.execute(sql`
