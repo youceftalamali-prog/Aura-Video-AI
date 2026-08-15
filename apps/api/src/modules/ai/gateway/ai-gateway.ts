@@ -9,6 +9,7 @@ import type {
   IAIProvider,
 } from '../interfaces/ai-provider.interface.js';
 import type { ProviderConfigService, ProviderResolution } from '../services/provider-config.service.js';
+import type { ModelAllowlistRepository } from '../repositories/model-allowlist.repository.js';
 import { fetchOpenRouterCatalog, toModelDescriptor } from './openrouter-catalog.js';
 import type { ResolvedCandidate } from './routing-resolver.js';
 import type { ModelRegistry } from './model-registry.js';
@@ -44,12 +45,15 @@ export class AIGateway implements IAIProvider {
   strategy: RoutingStrategy = 'balanced';
 
   private syncPromise: Promise<void> | null = null;
+  private allowlistSyncPromise: Promise<void> | null = null;
+  private allowlistSyncedAt = 0;
 
   constructor(
     private readonly providers: ProviderRegistry,
     private readonly resolver: RoutingResolver,
     private readonly models: ModelRegistry,
     private readonly configService: ProviderConfigService | null = null,
+    private readonly allowlistRepo: ModelAllowlistRepository | null = null,
   ) {}
 
   execute(capability: AICapability, strategy: RoutingStrategy = this.strategy, options: ExecuteOptions = {}): IAIProvider {
@@ -107,17 +111,45 @@ export class AIGateway implements IAIProvider {
     return this.providers.get(providerId);
   }
 
-  /** Safe model list for the public endpoint (no secrets). */
+  /** Safe model list for the public endpoint (no secrets and only allowed models). */
   async listModels(): Promise<ModelDescriptor[]> {
     await this.syncConfiguredProviders();
     await this.models.refreshIfStale();
+    await this.syncModelAllowlist();
     return this.models.list();
   }
 
-  /** Forces a catalog refresh and returns the fresh model list (admin action). */
+  /** Forces a catalog refresh and returns the fresh, allowlisted model list (admin action). */
   async refreshModelsCatalog(): Promise<ModelDescriptor[]> {
     await this.syncConfiguredProviders();
     await this.models.refresh();
+    await this.syncModelAllowlist(true);
+    return this.models.list();
+  }
+
+  /** Replaces the administrator's global allowlist for one provider. */
+  async setAllowedModels(providerId: string, modelIds: string[]): Promise<ModelDescriptor[]> {
+    if (!this.allowlistRepo) {
+      throw new AppError('AI model allowlist is not configured', 503, 'AI_ALLOWLIST_UNAVAILABLE');
+    }
+    if (providerId !== 'openai' && providerId !== 'openrouter') {
+      throw new AppError('Only OpenAI and OpenRouter models can be allowlisted', 400, 'AI_PROVIDER_INVALID');
+    }
+    if (modelIds.length === 0) {
+      throw new AppError('At least one model must be selected', 400, 'AI_MODEL_ALLOWLIST_EMPTY');
+    }
+
+    await this.syncConfiguredProviders();
+    await this.models.refreshIfStale();
+    const available = this.models.all().filter((model) => model.provider === providerId);
+    const availableIds = new Set(available.map((model) => model.id));
+    const invalid = modelIds.filter((modelId) => !availableIds.has(modelId));
+    if (invalid.length > 0) {
+      throw new AppError('One or more selected models are unavailable', 400, 'AI_MODEL_UNAVAILABLE', { invalid });
+    }
+
+    await this.allowlistRepo.replace(providerId, [...new Set(modelIds)]);
+    await this.syncModelAllowlist(true);
     return this.models.list();
   }
 
@@ -127,6 +159,7 @@ export class AIGateway implements IAIProvider {
     models: ReturnType<ModelRegistry['status']>;
   }> {
     await this.syncConfiguredProviders();
+    await this.syncModelAllowlist();
     const providers: Record<string, ProviderAvailability> = {};
     for (const provider of this.providers.all()) {
       providers[provider.name] = this.providers.availabilityOf(provider.name);
@@ -170,6 +203,23 @@ export class AIGateway implements IAIProvider {
     }
   }
 
+  private async syncModelAllowlist(force = false): Promise<void> {
+    if (!this.allowlistRepo) return;
+    if (!force && Date.now() - this.allowlistSyncedAt < 5000) return;
+    if (!this.allowlistSyncPromise) {
+      this.allowlistSyncPromise = this.allowlistRepo
+        .list()
+        .then((entries) => {
+          this.models.setAllowlist(entries);
+          this.allowlistSyncedAt = Date.now();
+        })
+        .finally(() => {
+          this.allowlistSyncPromise = null;
+        });
+    }
+    await this.allowlistSyncPromise;
+  }
+
   private ensureOpenRouterSource(): void {
     if (this.models.hasSource()) return;
     this.models.setSource(async () => {
@@ -197,6 +247,7 @@ export class AIGateway implements IAIProvider {
   ): Promise<T> {
     const strategy = options.strategy ?? this.strategy;
     await this.syncConfiguredProviders();
+    await this.syncModelAllowlist();
 
     let candidates: ResolvedCandidate[];
     if (options.providerId) {
