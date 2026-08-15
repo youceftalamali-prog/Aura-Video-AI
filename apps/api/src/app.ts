@@ -8,6 +8,7 @@ import { AppError } from '@aura/shared';
 import { createContainer } from './container.js';
 import { createApiRouter } from './infrastructure/http/routes/index.js';
 import { errorHandler, notFoundHandler } from './infrastructure/http/middleware/error.middleware.js';
+import { requestIdMiddleware } from './infrastructure/http/middleware/request-id.middleware.js';
 import { getStorageProvider, LocalStorageProvider } from './infrastructure/storage/index.js';
 import { decodeStorageKey } from './infrastructure/storage/local-signing.js';
 import { createReadStream } from 'node:fs';
@@ -34,6 +35,7 @@ export function createApp(): Express {
   const container = createContainer();
 
   app.set('trust proxy', 1);
+  app.use(requestIdMiddleware);
   app.use(helmet());
   app.use(
     cors({

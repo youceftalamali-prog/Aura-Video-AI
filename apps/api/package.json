@@ -14,6 +14,7 @@
     "test:library": "tsx scripts/library-deterministic-test.ts",
     "test:billing": "tsx scripts/billing-deterministic-test.ts",
     "test:paypal": "tsx scripts/paypal-deterministic-test.ts",
+    "test:production": "tsx scripts/production-readiness-deterministic-test.ts",
     "clean": "rm -rf dist",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",

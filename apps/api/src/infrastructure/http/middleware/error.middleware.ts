@@ -20,7 +20,6 @@ const SAFE_ERROR_CODES = new Set([
   'PRODUCT_URL_TOO_LARGE',
   'URL_NOT_HTML',
   'URL_FETCH_TIMEOUT',
-  'URL_REDIRECT_BLOCKED',
   'REMOTE_RESPONSE_TOO_LARGE',
 ]);
 
@@ -34,10 +33,11 @@ function publicMessage(code: string, message: string): string {
 
 export function errorHandler(
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ): void {
+  const requestId = typeof res.locals.requestId === 'string' ? res.locals.requestId : undefined;
   const isAppError = err instanceof AppError;
   let statusCode = isAppError ? err.statusCode : 500;
   let code = isAppError ? err.code : 'INTERNAL_ERROR';
@@ -57,6 +57,9 @@ export function errorHandler(
     console.error(JSON.stringify({
       level: 'error',
       event: 'http_error',
+      requestId,
+      method: req.method,
+      path: req.originalUrl,
       code,
       statusCode,
       message: err.message,
@@ -65,8 +68,6 @@ export function errorHandler(
     }));
   }
 
-  // Never return provider responses, storage errors, stacks, or arbitrary AppError
-  // details to clients. Validation paths are intentionally the only public details.
   const body: ApiResponse = {
     success: false,
     error: {
