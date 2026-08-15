@@ -11,7 +11,7 @@ import type {
   ProductAnalysis,
   RoutingStrategy,
 } from '@aura/types';
-import { NotFoundError } from '@aura/shared';
+import { AppError, NotFoundError } from '@aura/shared';
 import type { ProductRepository } from './product.repository.js';
 import type { ProductIntelligenceRepository } from './product-intelligence.repository.js';
 import type { UrlImportService } from './url-import.service.js';
@@ -128,147 +128,7 @@ export class ProductService {
   async importImage(userId: string, workspaceId: string, input: ImportImageInput): Promise<ProductImportResult> {
     log('import_started', { source: 'image', userId });
     const operationKey = randomUUID();
-    await this.maybeCharge(workspaceId, userId, operationKey);
-    try {
-      const analysis = await this.analysis.analyzeFromImage({
-        imageUrl: input.imageUrl,
-        imageBase64: input.imageBase64,
-        mimeType: input.mimeType,
-        name: input.name,
-        description: input.description,
-        strategy: input.strategy,
-      });
-      analysis.sourceType = 'image';
-      analysis.imageUrl = input.imageUrl ?? analysis.imageUrl;
-      const intel = await this.intelligence.build(analysis, null, input.strategy);
-      const product = await this.repo.create({
-        workspaceId,
-        userId,
-        name: analysis.productName,
-        description: analysis.longDescription || analysis.shortDescription,
-        imageUrl: input.imageUrl ?? null,
-        externalSource: 'image',
-        metadata: { intelligence: intel, analysis },
-      });
-      await this.intelligenceRepo?.saveReady(product.id, intel, null);
-      return { product, intelligence: intel, extracted: null };
-    } catch (err) {
-      await this.maybeRefund(workspaceId, userId, operationKey);
-      throw err;
-    }
-  }
-
-  async getIntelligence(userId: string, productId: string): Promise<ProductIntelligence> {
-    const product = await this.get(userId, productId);
-    const stored = await this.intelligenceRepo?.getByProductId(productId);
-    if (stored?.status === 'ready' && stored.intelligence) {
-      return stored.intelligence;
-    }
-
-    const meta = product.metadata || {};
-    if (meta.intelligence) return meta.intelligence as unknown as ProductIntelligence;
-    return this.refreshIntelligence(userId, productId);
-  }
-
-  async refreshIntelligence(
-    userId: string,
-    productId: string,
-    strategy?: RoutingStrategy,
-  ): Promise<ProductIntelligence> {
-    const product = await this.get(userId, productId);
-    const meta = product.metadata || {};
-    try {
-      const extracted = (meta.extracted as unknown as import('@aura/types').ExtractedProductData) || null;
-      const analysis =
-        (meta.analysis as unknown as ProductAnalysis) ||
-        (await this.analysis.analyzeFromText({
-          name: product.name,
-          description: product.description || product.name,
-          strategy,
-        }));
-      const intel = await this.intelligence.build(analysis, extracted, strategy);
-      await this.repo.updateMetadata(productId, { ...meta, intelligence: intel, analysis });
-      await this.intelligenceRepo?.saveReady(productId, intel, extracted);
-      return intel;
-    } catch (err) {
-      await this.intelligenceRepo?.markFailed(productId, err instanceof Error ? err.name : 'PRODUCT_INTELLIGENCE_FAILED');
-      throw err;
-    }
-  }
-
-  async generateHooks(userId: string, productId: string, strategy?: RoutingStrategy): Promise<GeneratedHook[]> {
-    const intel = await this.getIntelligence(userId, productId);
-    return this.intelligence.generateHooks(intel.analysis, intel, strategy);
-  }
-
-  async createVideoWorkflow(
-    userId: string,
-    input: CreateVideoFromProductInput,
-  ): Promise<CreateVideoFromProductResult> {
-    const product = await this.get(userId, input.productId);
-    const intel = await this.getIntelligence(userId, product.id);
-    const analysis = intel.analysis;
-
-    const angle =
-      intel.marketingAngles.find((a) => a.type === input.angleType) ||
-      intel.marketingAngles.find((a) => a.recommended) ||
-      intel.marketingAngles[0] ||
-      null;
-
-    const userRequest = [
-      angle ? `Marketing angle: ${angle.title} — ${angle.description}` : '',
-      input.hookText ? `Use hook: ${input.hookText}` : '',
-      input.platform ? `Platform: ${input.platform}` : '',
-      input.tone ? `Tone: ${input.tone}` : '',
-      input.duration ? `Duration: ${input.duration}s` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
-
-    log('video_workflow_started', { productId: product.id, userId });
-
-    const strategy = await this.strategy.generate({
-      productAnalysis: analysis,
-      userRequest: userRequest || undefined,
-      preferredDuration: input.duration,
-      preferredAspectRatio: input.aspectRatio,
-    });
-
-    const script = await this.script.generate({
-      productAnalysis: analysis,
-      creativeStrategy: strategy,
-    });
-
-    const storyboard = await this.storyboard.generate({
-      adScript: script,
-      creativeStrategy: strategy,
-      aspectRatio: input.aspectRatio || strategy.suggestedAspectRatio,
-    });
-
-    const allTemplates = await this.templates.listActive();
-    const templateRecommendations = this.templates.recommend(analysis, strategy, allTemplates, 5);
-
-    log('storyboard_generated', { productId: product.id });
-
-    return {
-      productId: product.id,
-      analysis,
-      intelligence: intel,
-      strategy,
-      script,
-      storyboard,
-      templateRecommendations,
-      selectedHook: input.hookText ?? intel.contentRecommendations.hooks[0] ?? null,
-      selectedAngle: angle,
-    };
-  }
-
-  private async maybeCharge(workspaceId: string, userId: string, operationKey: string): Promise<void> {
-    const env = getEnv();
-    if (!env.PRODUCT_ANALYSIS_ENABLED_BILLING || !this.credits) return;
-    const amount = env.PRODUCT_ANALYSIS_CREDITS;
-    if (amount <= 0) return;
-    await this.credits.deduct(workspaceId, amount, {
+    await this.maybeCharge(workspaceId, amount, {
       userId,
       description: 'Product analysis charge',
       referenceType: 'product_analysis',
