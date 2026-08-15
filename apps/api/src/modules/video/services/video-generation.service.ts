@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { getEnv } from '@aura/config';
@@ -111,9 +111,6 @@ export class VideoGenerationService {
         },
       });
     } catch (err) {
-      // A concurrent retry may have created the idempotent job after the first
-      // lookup. In that case the charge is already represented by that job and
-      // must not be refunded by the losing request.
       if (request.idempotencyKey) {
         const existing = await this.jobs.findByIdempotency(project.workspaceId, request.idempotencyKey);
         if (existing) {
@@ -132,7 +129,6 @@ export class VideoGenerationService {
 
     logEvent('generation_requested', { jobId: job.id, projectId: project.id, userId, mode, credits: estimate.credits });
 
-    // Non-blocking background processing
     setImmediate(() => {
       this.processJob(job.id).catch((err) => {
         console.error(JSON.stringify({ level: 'error', event: 'background_process_failed', jobId: job.id, error: (err as unknown as Error).message }));
@@ -183,7 +179,6 @@ export class VideoGenerationService {
       });
       logEvent('generation_submitted', { jobId, providerJobId: submitted.providerJobId });
 
-      // Poll provider until terminal or timeout
       const maxAttempts = 60;
       let remoteUrl: string | null = null;
       for (let i = 0; i < maxAttempts; i++) {
@@ -226,7 +221,6 @@ export class VideoGenerationService {
         throw new AppError('Video generation timed out', 504, 'VIDEO_GENERATION_TIMEOUT');
       }
 
-      // Compose + store
       await this.jobs.update(jobId, { status: 'composing', currentStage: 'composing', progress: 75 });
       logEvent('generation_processing', { jobId, stage: 'composing' });
 
@@ -245,7 +239,6 @@ export class VideoGenerationService {
       });
 
       const assetId = await this.persistLocalVideo(job, composed.localPath);
-      const storageUrl = (await this.jobs.findById(jobId))?.outputUrl;
 
       await this.jobs.update(jobId, {
         status: 'completed',
@@ -255,11 +248,10 @@ export class VideoGenerationService {
         completedAt: new Date(),
       });
 
-      // cleanup temps
       await fs.unlink(localProviderPath).catch(() => undefined);
       await fs.unlink(composed.localPath).catch(() => undefined);
 
-      logEvent('generation_completed', { jobId, assetId, outputUrl: storageUrl });
+      logEvent('generation_completed', { jobId, assetId });
     } catch (err) {
       const message = err instanceof AppError ? err.message : (err as unknown as Error).message;
       await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, message, job.userId);
@@ -270,6 +262,27 @@ export class VideoGenerationService {
   async getJob(userId: string, jobId: string): Promise<VideoGenerationJobPublic> {
     const job = await this.jobs.findByIdForUser(jobId, userId);
     if (!job) throw new AppError('Video job not found', 404, 'VIDEO_JOB_NOT_FOUND');
+
+    // Never return an expired URL when an asset is available. Resolve a fresh
+    // server-signed URL, while keeping ownership scoped to the requesting user.
+    if (job.assetId) {
+      const rows = await this.db
+        .select({ storageKey: assets.storageKey, status: assets.status })
+        .from(assets)
+        .where(and(eq(assets.id, job.assetId), eq(assets.userId, userId)))
+        .limit(1);
+      const asset = rows[0];
+      if (asset?.status === 'ready') {
+        const storage = getStorageProvider();
+        if (await storage.exists(asset.storageKey)) {
+          job.outputUrl = await storage.getSignedUrl(asset.storageKey, 3600);
+        } else {
+          job.outputUrl = null;
+        }
+      } else {
+        job.outputUrl = null;
+      }
+    }
     return this.toPublic(job);
   }
 
