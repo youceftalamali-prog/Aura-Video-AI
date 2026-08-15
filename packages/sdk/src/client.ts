@@ -69,6 +69,7 @@ import type {
   CreateAgentConversationInput,
   SendAgentMessageInput,
   AgentTurnResult,
+  RoutingStrategy,
 } from '@aura/types';
 
 export interface AuraClientOptions {
@@ -277,8 +278,11 @@ export class AuraClient {
     return this.request<{ deleted: boolean }>('DELETE', `/api/v1/products/${id}`);
   }
 
-  async importProductUrl(url: string): Promise<ProductImportResult> {
-    return this.request<ProductImportResult>('POST', '/api/v1/products/import/url', { url });
+  async importProductUrl(url: string, strategy?: RoutingStrategy): Promise<ProductImportResult> {
+    return this.request<ProductImportResult>('POST', '/api/v1/products/import/url', {
+      url,
+      ...(strategy ? { strategy } : {}),
+    });
   }
 
   async importProductText(input: ImportTextInput): Promise<ProductImportResult> {
@@ -293,8 +297,16 @@ export class AuraClient {
     return this.request<ProductIntelligence>('GET', `/api/v1/products/${id}/intelligence`);
   }
 
-  async generateProductHooks(id: string): Promise<GeneratedHook[]> {
-    return this.request<GeneratedHook[]>('POST', `/api/v1/products/${id}/hooks`);
+  async refreshProductIntelligence(id: string, strategy?: RoutingStrategy): Promise<ProductIntelligence> {
+    return this.request<ProductIntelligence>('POST', `/api/v1/products/${id}/intelligence/refresh`, {
+      ...(strategy ? { strategy } : {}),
+    });
+  }
+
+  async generateProductHooks(id: string, strategy?: RoutingStrategy): Promise<GeneratedHook[]> {
+    return this.request<GeneratedHook[]>('POST', `/api/v1/products/${id}/hooks`, {
+      ...(strategy ? { strategy } : {}),
+    });
   }
 
   async createVideoFromProduct(id: string, input?: Omit<CreateVideoFromProductInput, 'productId'>): Promise<CreateVideoFromProductResult> {
