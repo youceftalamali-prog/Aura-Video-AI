@@ -19,6 +19,7 @@ export class ModelRegistry {
   private refreshedAt: number | null = null;
   private lastError: string | null = null;
   private refreshPromise: Promise<ModelDescriptor[]> | null = null;
+  private allowlistByProvider: Map<string, Set<string>> | null = null;
 
   register(descriptor: ModelDescriptor): void {
     this.staticModels.set(descriptor.id, descriptor);
@@ -38,6 +39,22 @@ export class ModelRegistry {
 
   hasSource(): boolean {
     return this.source !== null;
+  }
+
+  /** Applies the administrator's persisted allowlist. Providers without rows remain unrestricted. */
+  setAllowlist(entries: Array<{ providerId: string; modelId: string }>): void {
+    const next = new Map<string, Set<string>>();
+    for (const entry of entries) {
+      const models = next.get(entry.providerId) ?? new Set<string>();
+      models.add(entry.modelId);
+      next.set(entry.providerId, models);
+    }
+    this.allowlistByProvider = next.size > 0 ? next : null;
+  }
+
+  isAllowed(descriptor: ModelDescriptor): boolean {
+    const providerAllowlist = this.allowlistByProvider?.get(descriptor.provider);
+    return !providerAllowlist || providerAllowlist.has(descriptor.id);
   }
 
   /** Forces a catalog refresh (coalesced when already in flight). */
@@ -92,9 +109,10 @@ export class ModelRegistry {
   resolve(modelOrAlias: string): ModelDescriptor | null {
     const staticId = this.staticAliases.get(modelOrAlias) ?? modelOrAlias;
     const staticModel = this.staticModels.get(staticId);
-    if (staticModel) return staticModel;
+    if (staticModel && this.isAllowed(staticModel)) return staticModel;
     const dynamicId = this.dynamicAliases.get(modelOrAlias) ?? modelOrAlias;
-    return this.dynamicModels.get(dynamicId) ?? null;
+    const dynamicModel = this.dynamicModels.get(dynamicId);
+    return dynamicModel && this.isAllowed(dynamicModel) ? dynamicModel : null;
   }
 
   /** Resolves with one forced refresh on miss (e.g. for explicit modelId requests). */
@@ -105,7 +123,13 @@ export class ModelRegistry {
     return this.resolve(modelOrAlias);
   }
 
+  /** Returns only models allowed for user-facing selection and routing. */
   list(): ModelDescriptor[] {
+    return this.all().filter((descriptor) => this.isAllowed(descriptor));
+  }
+
+  /** Returns the complete loaded registry for admin validation only. */
+  all(): ModelDescriptor[] {
     return [...this.staticModels.values(), ...this.dynamicModels.values()];
   }
 
