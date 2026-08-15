@@ -80,6 +80,15 @@ async function main(): Promise<void> {
     check('Product Intelligence payload column exists', columns.has('intelligence'));
     check('Product Intelligence error column exists', columns.has('error_code'));
 
+    const projectColumns = await pool.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'projects'
+         AND column_name = 'video_asset_id'`,
+    );
+    check('Projects canonical video_asset_id column exists', projectColumns.rows.length === 1);
+
     console.log('Scenario 2: Redis connectivity and read/write round trip');
     await redis.connect();
     check('Redis responds to PING', (await redis.ping()) === 'PONG');
