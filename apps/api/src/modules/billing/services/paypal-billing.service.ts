@@ -73,25 +73,16 @@ export class PayPalBillingService {
 
   listCreditPackages() {
     return (Object.keys(CREDIT_PACKAGES) as unknown as CreditPackageKey[]).map((key) => {
-      // Pricing is optional for the visibility page. Do not make GET /overview
-      // fail merely because checkout secrets or package prices are absent.
+      // Pricing is optional for the visibility page. Default sample prices do
+      // not count as checkout configuration until PayPal credentials exist.
+      if (!isPayPalConfigured()) {
+        return { key, ...CREDIT_PACKAGES[key], priceConfigured: false, value: null, currency: null };
+      }
       try {
         const pricing = creditPackageValue(key);
-        return {
-          key,
-          ...CREDIT_PACKAGES[key],
-          priceConfigured: true,
-          value: pricing.value,
-          currency: pricing.currency,
-        };
+        return { key, ...CREDIT_PACKAGES[key], priceConfigured: true, value: pricing.value, currency: pricing.currency };
       } catch {
-        return {
-          key,
-          ...CREDIT_PACKAGES[key],
-          priceConfigured: false,
-          value: null,
-          currency: null,
-        };
+        return { key, ...CREDIT_PACKAGES[key], priceConfigured: false, value: null, currency: null };
       }
     });
   }
@@ -108,7 +99,6 @@ export class PayPalBillingService {
     }
     const planId = paypalPlanId(plan);
     const ws = await this.getWorkspaceForUser(userId);
-
     const existing = await this.db
       .select()
       .from(subscriptions)
