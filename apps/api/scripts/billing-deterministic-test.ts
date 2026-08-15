@@ -7,6 +7,19 @@ process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/aura_test_dumm
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.JWT_SECRET = 'billing-test-secret-0123456789abcdef0123456789';
 
+for (const key of [
+  'PAYPAL_CLIENT_ID',
+  'PAYPAL_CLIENT_SECRET',
+  'PAYPAL_STARTER_PLAN_ID',
+  'PAYPAL_PRO_PLAN_ID',
+  'PAYPAL_BUSINESS_PLAN_ID',
+  'PAYPAL_CREDITS_SMALL_VALUE',
+  'PAYPAL_CREDITS_MEDIUM_VALUE',
+  'PAYPAL_CREDITS_LARGE_VALUE',
+]) {
+  delete process.env[key];
+}
+
 import { estimateBodySchema, topUpBodySchema, workspaceUpdateSchema } from '../src/modules/billing/dto/schemas.js';
 import { CREDIT_PACKAGES, PLAN_IDS } from '../src/modules/billing/providers/plans.js';
 import { PayPalBillingService } from '../src/modules/billing/services/paypal-billing.service.js';
