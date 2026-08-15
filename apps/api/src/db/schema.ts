@@ -188,6 +188,7 @@ export const projects = pgTable(
     status: varchar('status', { length: 20 }).notNull().default('draft'),
     templateId: uuid('template_id').references(() => templates.id, { onDelete: 'set null' }),
     productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
+    videoAssetId: uuid('video_asset_id').references(() => assets.id, { onDelete: 'set null' }),
     thumbnailUrl: text('thumbnail_url'),
     videoUrl: text('video_url'),
     durationSeconds: integer('duration_seconds'),
@@ -201,6 +202,7 @@ export const projects = pgTable(
     workspaceIdIdx: index('projects_workspace_id_idx').on(table.workspaceId),
     userIdIdx: index('projects_user_id_idx').on(table.userId),
     statusIdx: index('projects_status_idx').on(table.status),
+    videoAssetIdIdx: index('projects_video_asset_id_idx').on(table.videoAssetId),
   }),
 );
 
@@ -252,7 +254,6 @@ export const creditWallets = pgTable(
     workspaceIdIdx: uniqueIndex('credit_wallets_workspace_id_idx').on(table.workspaceId),
   }),
 );
-
 
 export const videoGenerationJobs = pgTable(
   'video_generation_jobs',
@@ -316,6 +317,7 @@ export const projectsRelations = relations(projects, ({ one }) => ({
   user: one(users, { fields: [projects.userId], references: [users.id] }),
   template: one(templates, { fields: [projects.templateId], references: [templates.id] }),
   product: one(products, { fields: [projects.productId], references: [products.id] }),
+  videoAsset: one(assets, { fields: [projects.videoAssetId], references: [assets.id] }),
 }));
 
 export const assetsRelations = relations(assets, ({ one }) => ({
@@ -328,7 +330,6 @@ export const productsRelations = relations(products, ({ one }) => ({
   user: one(users, { fields: [products.userId], references: [users.id] }),
   imageAsset: one(assets, { fields: [products.imageAssetId], references: [assets.id] }),
 }));
-
 
 export const paypalWebhookEvents = pgTable(
   'paypal_webhook_events',
@@ -364,7 +365,6 @@ export const creditWalletsRelations = relations(creditWallets, ({ one }) => ({
     references: [workspaces.id],
   }),
 }));
-
 
 export const socialConnections = pgTable(
   'social_connections',
