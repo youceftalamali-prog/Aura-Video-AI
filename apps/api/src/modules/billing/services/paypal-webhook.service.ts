@@ -138,7 +138,13 @@ export class PayPalWebhookService {
       if (!credits) {
         throw new AppError('Invalid credit package in PayPal custom_id', 400, 'INVALID_CREDIT_PACKAGE');
       }
-      await this.ledger.grant(workspaceId, credits);
+      const captureId = String(resource.id || 'unknown');
+      await this.ledger.grant(workspaceId, credits, {
+        description: 'PayPal credit purchase',
+        referenceType: 'paypal_capture',
+        referenceId: captureId,
+        idempotencyKey: `paypal:capture:${captureId}`,
+      });
       log('paypal_credits_granted', { workspaceId, credits, captureId: resource.id });
     }
   }
@@ -233,7 +239,13 @@ export class PayPalWebhookService {
     if (grantCredits && mapped === 'active') {
       const credits = PLAN_META[planKey]?.includedCredits ?? 0;
       if (credits > 0) {
-        await this.claimPeriodGrant({ workspaceId, subId, credits, planKey });
+        await this.claimPeriodGrant({
+          workspaceId,
+          subId,
+          credits,
+          planKey,
+          periodKey: now.toISOString(),
+        });
       }
     }
   }
@@ -249,8 +261,9 @@ export class PayPalWebhookService {
     subId: string;
     credits: number;
     planKey: string;
+    periodKey: string;
   }): Promise<void> {
-    const { workspaceId, subId, credits, planKey } = input;
+    const { workspaceId, subId, credits, planKey, periodKey } = input;
     await this.db.transaction(async (tx) => {
       const claimed = await tx
         .update(subscriptions)
@@ -267,7 +280,12 @@ export class PayPalWebhookService {
         log('paypal_period_credits_skipped', { workspaceId, subId, reason: 'already_granted' });
         return;
       }
-      await new CreditLedgerService(tx).grant(workspaceId, credits);
+      await new CreditLedgerService(tx).grant(workspaceId, credits, {
+        description: 'PayPal subscription period credits',
+        referenceType: 'paypal_subscription_period',
+        referenceId: `${subId}:${periodKey}`,
+        idempotencyKey: `paypal:subscription:${subId}:${periodKey}`,
+      });
       log('paypal_subscription_credits_granted', { workspaceId, credits, subId, planKey });
     });
   }
@@ -324,7 +342,12 @@ export class PayPalWebhookService {
         log('paypal_sale_cycle_already_granted', { billingAgreementId, workspaceId: sub.workspaceId });
         return;
       }
-      await new CreditLedgerService(tx).grant(sub.workspaceId, credits);
+      await new CreditLedgerService(tx).grant(sub.workspaceId, credits, {
+        description: 'PayPal subscription renewal credits',
+        referenceType: 'paypal_subscription_period',
+        referenceId: `${billingAgreementId}:${now.toISOString()}`,
+        idempotencyKey: `paypal:subscription:${billingAgreementId}:${now.toISOString()}`,
+      });
       log('paypal_subscription_renewal_credits', {
         workspaceId: sub.workspaceId,
         credits,
