@@ -3,7 +3,7 @@
 Enterprise SaaS for AI-powered advertising video generation.
 
 ## Status
-**Phases 1–13 implemented; Phase 14 final production hardening added.**
+**Phases 1–13 implemented; Phases 14–15 production hardening and AI governance added.**
 
 The repository is statically hardened and ready for the infrastructure readiness gate.
 Live runtime/provider verification still requires the configured PostgreSQL, Redis, storage,
@@ -34,6 +34,7 @@ pnpm dev
 Final readiness checks:
 ```bash
 pnpm --filter @aura/api test:production
+pnpm --filter @aura/api test:ai-gateway
 pnpm --filter @aura/api test:billing
 pnpm --filter @aura/api test:paypal
 pnpm --filter @aura/api test:library
