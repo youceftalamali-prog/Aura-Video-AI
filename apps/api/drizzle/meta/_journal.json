@@ -36,6 +36,13 @@
       "when": 1786785789000,
       "tag": "0004_credit_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786787000000,
+      "tag": "0005_ai_model_allowlist",
+      "breakpoints": true
     }
   ]
 }
