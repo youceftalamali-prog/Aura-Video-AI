@@ -1,6 +1,10 @@
+import { randomUUID } from 'node:crypto';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { Redis } from 'ioredis';
 import { loadEnv } from '@aura/config';
+import * as schema from '../src/db/schema.js';
+import { CreditLedgerService } from '../src/modules/video/services/credit-ledger.service.js';
 
 const { Pool } = pg;
 
@@ -31,12 +35,26 @@ function check(label: string, condition: boolean, detail = ''): void {
   }
 }
 
+async function expectFailure(
+  label: string,
+  expectedCode: string,
+  operation: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    await operation();
+    check(label, false, `expected ${expectedCode}`);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    check(label, code === expectedCode, `received ${code ?? 'unknown'}`);
+  }
+}
+
 async function main(): Promise<void> {
   const env = loadEnv();
   const pool = new Pool({
     connectionString: env.DATABASE_URL,
     connectionTimeoutMillis: 10_000,
-    max: 2,
+    max: 4,
   });
   const redis = new Redis(env.REDIS_URL, {
     lazyConnect: true,
@@ -118,6 +136,96 @@ async function main(): Promise<void> {
     check('Redis stores readiness value', (await redis.get(readinessKey)) === 'ok');
     await redis.del(readinessKey);
     check('Redis readiness key can be removed', (await redis.exists(readinessKey)) === 0);
+
+    console.log('Scenario 3: atomic credit ledger, idempotency, and refund bounds');
+    const database = drizzle(pool, { schema });
+    const ledger = new CreditLedgerService(database);
+    const testUserId = randomUUID();
+    const testWorkspaceId = randomUUID();
+
+    try {
+      await pool.query(
+        `INSERT INTO users (id, email, full_name)
+         VALUES ($1, $2, $3)`,
+        [testUserId, `runtime-${testUserId}@example.test`, 'Runtime Credit Test'],
+      );
+      await pool.query(
+        `INSERT INTO workspaces (id, name, slug, owner_id)
+         VALUES ($1, $2, $3, $4)`,
+        [testWorkspaceId, 'Runtime Credit Test', `runtime-${testWorkspaceId.slice(0, 8)}`, testUserId],
+      );
+
+      check(
+        'first grant creates wallet with expected balance',
+        (await ledger.grant(testWorkspaceId, 100, { idempotencyKey: 'runtime:grant:1' })) === 100,
+      );
+      check(
+        'repeated grant is idempotent',
+        (await ledger.grant(testWorkspaceId, 100, { idempotencyKey: 'runtime:grant:1' })) === 100,
+      );
+      check(
+        'deduction reduces balance atomically',
+        (await ledger.deduct(testWorkspaceId, 40, { idempotencyKey: 'runtime:usage:1' })) === 60,
+      );
+      check(
+        'repeated deduction is idempotent',
+        (await ledger.deduct(testWorkspaceId, 40, { idempotencyKey: 'runtime:usage:1' })) === 60,
+      );
+      check(
+        'refund restores balance atomically',
+        (await ledger.refund(testWorkspaceId, 40, { idempotencyKey: 'runtime:refund:1' })) === 100,
+      );
+      check(
+        'repeated refund is idempotent',
+        (await ledger.refund(testWorkspaceId, 40, { idempotencyKey: 'runtime:refund:1' })) === 100,
+      );
+
+      await expectFailure(
+        'rejects idempotency key reuse for a different amount',
+        'CREDIT_MUTATION_CONFLICT',
+        () => ledger.grant(testWorkspaceId, 101, { idempotencyKey: 'runtime:grant:1' }),
+      );
+      await expectFailure(
+        'rejects deduction larger than balance',
+        'INSUFFICIENT_CREDITS',
+        () => ledger.deduct(testWorkspaceId, 1_000, { idempotencyKey: 'runtime:usage:insufficient' }),
+      );
+
+      await Promise.all(
+        Array.from({ length: 5 }, (_, index) =>
+          ledger.deduct(testWorkspaceId, 10, { idempotencyKey: `runtime:concurrent:${index}` }),
+        ),
+      );
+      check('concurrent deductions preserve the wallet lock', (await ledger.getBalance(testWorkspaceId)) === 50);
+      await expectFailure(
+        'rejects refund larger than net used credits',
+        'CREDIT_REFUND_EXCEEDS_USAGE',
+        () => ledger.refund(testWorkspaceId, 60, { idempotencyKey: 'runtime:refund:oversized' }),
+      );
+
+      const wallet = await pool.query<{ balance: number; lifetime_granted: number; lifetime_used: number }>(
+        `SELECT balance, lifetime_granted, lifetime_used
+         FROM credit_wallets
+         WHERE workspace_id = $1`,
+        [testWorkspaceId],
+      );
+      check(
+        'wallet counters remain consistent',
+        wallet.rows[0]?.balance === 50
+          && wallet.rows[0]?.lifetime_granted === 100
+          && wallet.rows[0]?.lifetime_used === 50,
+      );
+      const transactions = await pool.query<{ count: number }>(
+        `SELECT count(*)::int AS count
+         FROM credit_transactions
+         WHERE workspace_id = $1`,
+        [testWorkspaceId],
+      );
+      check('idempotent retries do not create duplicate ledger rows', transactions.rows[0]?.count === 8);
+    } finally {
+      await pool.query('DELETE FROM workspaces WHERE id = $1', [testWorkspaceId]).catch(() => undefined);
+      await pool.query('DELETE FROM users WHERE id = $1', [testUserId]).catch(() => undefined);
+    }
 
     console.log(`Result: ${passed} passed, ${failed} failed`);
     if (failed > 0) process.exitCode = 1;
