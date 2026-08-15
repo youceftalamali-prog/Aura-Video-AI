@@ -144,7 +144,6 @@ export class SettingsController {
       if (!workspace) throw new NotFoundError('Workspace not found');
 
       await this.workspaceSettings.upsert(workspace.id, {
-        defaultAiModel: patch.defaultAiModel,
         aiStrategy: patch.aiStrategy,
       });
 
