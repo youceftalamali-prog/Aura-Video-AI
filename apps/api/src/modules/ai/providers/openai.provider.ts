@@ -89,6 +89,7 @@ ${params.schemaDescription}`;
     const raw = await this.analyzeText({
       systemPrompt: system,
       userPrompt: params.userPrompt,
+      modelId: params.modelId,
     });
 
     let parsed: unknown;
@@ -164,6 +165,7 @@ Respond in the same language as the product description when possible.`;
         mimeType: params.mimeType,
         systemPrompt,
         prompt: `Analyze this product image and the following context. Return ONLY JSON matching the schema.\n\nContext:\n${parts.join('\n')}\n\nsourceType must be "${sourceType}".`,
+        modelId: params.modelId,
       });
       result = this.parseProductAnalysis(visionText, sourceType, params);
     } else {
@@ -171,6 +173,7 @@ Respond in the same language as the product description when possible.`;
         systemPrompt,
         userPrompt: `${parts.join('\n')}\n\nsourceType must be "${sourceType}".`,
         schemaDescription,
+        modelId: params.modelId,
         parse: (raw) => this.parseProductAnalysis(JSON.stringify(raw), sourceType, params),
       });
     }
