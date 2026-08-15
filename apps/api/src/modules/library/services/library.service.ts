@@ -22,7 +22,9 @@ export class LibraryService {
     return ws.id;
   }
 
-  async listProjects(userId: string): Promise<Project[]> { return this.projects.listByUser(userId); }
+  async listProjects(userId: string): Promise<Project[]> {
+    return this.projects.listByUser(userId);
+  }
 
   async getProject(userId: string, id: string): Promise<Project> {
     const project = await this.projects.findByIdForUser(id, userId);
@@ -48,8 +50,8 @@ export class LibraryService {
   }
 
   async listAssets(userId: string, type?: string): Promise<Asset[]> {
-    const assets = await this.assets.listByUser(userId, type);
-    return Promise.all(assets.map((asset) => this.withSignedUrl(asset)));
+    const rows = await this.assets.listByUser(userId, type);
+    return Promise.all(rows.map((asset) => this.withSignedUrl(asset)));
   }
 
   async getAsset(userId: string, id: string): Promise<Asset> {
@@ -66,10 +68,22 @@ export class LibraryService {
     filename: string;
     sizeBytes: number;
   }> {
-    const asset = await this.getAsset(userId, id);
+    // Do not trust the URL persisted at upload time: it may be expired or
+    // stale. Export always checks ownership, readiness, object existence, and
+    // creates a fresh signed URL from the server-side storage key.
+    const asset = await this.assets.findByIdForUser(id, userId);
+    if (!asset) throw new NotFoundError('Asset');
     if (asset.status === 'deleted') throw new AppError('Asset not found', 404, 'ASSET_NOT_FOUND');
     if (asset.status !== 'ready') throw new AppError('Asset is not ready for export', 400, 'ASSET_NOT_READY');
+    if (!asset.storageKey) throw new AppError('Asset file not found', 404, 'ASSET_STORAGE_NOT_FOUND');
+
+    const storage = getStorageProvider();
+    if (!(await storage.exists(asset.storageKey))) {
+      throw new AppError('Asset file not found', 404, 'ASSET_STORAGE_NOT_FOUND');
+    }
+    const url = await storage.getSignedUrl(asset.storageKey, 3600);
     const filename = this.buildDownloadFilename(asset.name, asset.mimeType);
+
     console.log(JSON.stringify({
       level: 'info',
       event: 'asset_export_requested',
@@ -79,7 +93,7 @@ export class LibraryService {
       sizeBytes: asset.sizeBytes,
       ts: new Date().toISOString(),
     }));
-    return { assetId: asset.id, url: asset.url, mimeType: asset.mimeType, name: asset.name, filename, sizeBytes: asset.sizeBytes };
+    return { assetId: asset.id, url, mimeType: asset.mimeType, name: asset.name, filename, sizeBytes: asset.sizeBytes };
   }
 
   private async assertProjectReferences(
@@ -114,17 +128,37 @@ export class LibraryService {
   }
 
   private async withSignedUrl(asset: Asset): Promise<Asset> {
-    const url = await getStorageProvider().getSignedUrl(asset.storageKey, 3600);
-    return { ...asset, url };
+    if (asset.status !== 'ready' || !asset.storageKey) return { ...asset, url: '' };
+    const storage = getStorageProvider();
+    if (!(await storage.exists(asset.storageKey))) return { ...asset, url: '' };
+    return { ...asset, url: await storage.getSignedUrl(asset.storageKey, 3600) };
   }
 
   private buildDownloadFilename(name: string, mimeType: string): string {
-    const base = (name || 'aura-video').replace(/\.[a-z0-9]+$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'aura-video';
-    const ext = mimeType.includes('mp4') || mimeType.includes('video') ? 'mp4' : mimeType.includes('webm') ? 'webm' : mimeType.includes('png') ? 'png' : mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'bin';
+    const base = (name || 'aura-video')
+      .replace(/\.[a-z0-9]+$/i, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'aura-video';
+    const ext = mimeType.includes('mp4') || mimeType.includes('video')
+      ? 'mp4'
+      : mimeType.includes('webm')
+        ? 'webm'
+        : mimeType.includes('png')
+          ? 'png'
+          : mimeType.includes('jpeg') || mimeType.includes('jpg')
+            ? 'jpg'
+            : 'bin';
     return `aura-video-${base}.${ext}`;
   }
 
-  async attachVideoToProject(userId: string, projectId: string, videoUrl: string, opts?: { durationSeconds?: number; resolution?: string; thumbnailUrl?: string }): Promise<Project> {
+  async attachVideoToProject(
+    userId: string,
+    projectId: string,
+    videoUrl: string,
+    opts?: { durationSeconds?: number; resolution?: string; thumbnailUrl?: string },
+  ): Promise<Project> {
     return this.updateProject(userId, projectId, {
       videoUrl,
       status: 'completed',
