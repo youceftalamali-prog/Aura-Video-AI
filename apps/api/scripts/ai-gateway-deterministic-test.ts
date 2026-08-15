@@ -147,16 +147,40 @@ async function main(): Promise<void> {
   providers.setAvailability('openrouter', 'missing-key');
   const unavailableRank = resolver.rank('balanced', 'analyze-text');
   check('missing-key provider excluded', unavailableRank.every((candidate) => candidate.provider.name !== 'openrouter'));
+  let explicitUnavailable = false;
+  try {
+    resolver.rank('balanced', 'analyze-text', { modelId: routerBalanced.id });
+  } catch (err) {
+    explicitUnavailable = err instanceof AppError && err.code === 'AI_PROVIDER_UNAVAILABLE';
+  }
+  check('explicit model rejects unavailable provider', explicitUnavailable);
   providers.setAvailability('openrouter', 'disabled');
   check('disabled provider excluded', resolver.rank('smart', 'analyze-text').every((candidate) => candidate.provider.name !== 'openrouter'));
   providers.setAvailability('openrouter', 'enabled');
+  check(
+    'provider-specific routing rejects unsupported capability',
+    (() => {
+      try {
+        resolver.rankForProvider('balanced', 'analyze-image', 'openai', openai);
+        return false;
+      } catch (err) {
+        return err instanceof AppError && err.code === 'AI_PROVIDER_UNAVAILABLE';
+      }
+    })(),
+  );
 
-  console.log('Scenario 3: admin allowlist is enforced for listing and explicit selection');
+  console.log('Scenario 3: admin allowlist is enforced with default deny');
+  const locked = new ModelRegistry();
+  locked.register(openAiFast);
+  locked.setAllowlist([]);
+  check('empty persisted allowlist denies by default', locked.list().length === 0);
+
   await gateway.setAllowedModels('openrouter', [routerBalanced.id]);
+  await gateway.setAllowedModels('openai', [openAiFast.id, openAiSmart.id]);
   const visible = await gateway.listModels();
   check('selected OpenRouter model visible', visible.some((model) => model.id === routerBalanced.id));
   check('unselected OpenRouter models hidden', visible.every((model) => model.provider !== 'openrouter' || model.id === routerBalanced.id));
-  check('OpenAI models remain visible', visible.some((model) => model.provider === 'openai'));
+  check('explicitly selected OpenAI models visible', visible.some((model) => model.id === openAiFast.id));
 
   let blocked = false;
   try {
@@ -166,7 +190,11 @@ async function main(): Promise<void> {
   }
   check('unselected explicit model rejected', blocked);
 
-  console.log('Scenario 4: selected model id reaches provider and fallback is safe');
+  console.log('Scenario 4: explicit model and fallback are safe');
+  const explicit = await gateway.analyzeText({ systemPrompt: 'x', userPrompt: 'y', modelId: openAiSmart.id });
+  check('explicit model is passed to the selected provider', explicit === `openai:${openAiSmart.id}`, explicit);
+  check('explicit model call recorded', openai.calls.some((call) => call.modelId === openAiSmart.id));
+
   const first = await gateway.analyzeText({ systemPrompt: 'x', userPrompt: 'y' });
   check('automatic route uses selected default model', first === `openrouter:${routerBalanced.id}`, first);
   check('selected model id passed to provider', openrouter.calls.some((call) => call.modelId === routerBalanced.id));
