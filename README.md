@@ -3,9 +3,9 @@
 Enterprise SaaS for AI-powered advertising video generation.
 
 ## Status
-**Phases 1–13 implemented; Phases 14–19 production hardening, AI governance, Product Intelligence contract hardening, runtime readiness, project/video-asset integrity, and credit-ledger verification added.**
+**Phases 1–13 implemented; Phases 14–20 production hardening, AI governance, Product Intelligence contract hardening, runtime readiness, project/video-asset integrity, credit-ledger verification, storage, and FFmpeg readiness added.**
 
-The repository is statically hardened and now has repeatable infrastructure, output-integrity, and credit-ledger readiness checks.
+The repository is statically hardened and now has repeatable infrastructure, output-integrity, credit-ledger, storage, and media-runtime readiness checks.
 External provider verification still requires configured PostgreSQL, Redis, storage,
 PayPal, AI, video-provider, and FFmpeg services.
 
@@ -18,6 +18,7 @@ Product → AI Analysis → Creative → Script → Storyboard → Template → 
 - **Preview / Download:** 0 credits
 - **Generated output:** canonical `projects.video_asset_id` relation with fresh signed URLs
 - **Credits:** atomic wallet mutations with idempotent retries and bounded refunds
+- **Media runtime:** local storage signing and FFmpeg smoke verification available
 
 ## Stack
 Node 20+, pnpm 9, TypeScript, Express, React/Vite, PostgreSQL, Redis, FFmpeg, Cloudflare R2 (optional)
@@ -38,6 +39,7 @@ Final readiness checks:
 pnpm --filter @aura/api test:runtime
 pnpm --filter @aura/api test:video-asset
 pnpm --filter @aura/api test:credits
+pnpm --filter @aura/api test:storage
 pnpm --filter @aura/api test:production
 pnpm --filter @aura/api test:ai-gateway
 pnpm --filter @aura/api test:product-intelligence
