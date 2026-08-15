@@ -22,6 +22,7 @@ import type {
   VideoGenerationJobPublic,
 } from '@aura/types';
 import { api } from '../lib/api';
+import { VideoResultCard } from '../components/VideoResultCard';
 
 type Step = 'product' | 'strategy' | 'script' | 'storyboard' | 'template' | 'video';
 
@@ -56,7 +57,7 @@ export function CreativeStudioPage() {
     setError(null);
     setLoading(true);
     try {
-      const result = await api.analyzeProductText({ language: contentLanguage, contentLanguage, videoLanguage,  
+      const result = await api.analyzeProductText({ language: contentLanguage, contentLanguage, videoLanguage,
         name: productName,
         description: productDescription,
       });
@@ -74,7 +75,7 @@ export function CreativeStudioPage() {
     setError(null);
     setLoading(true);
     try {
-      const result = await api.generateStrategy({ language: contentLanguage, contentLanguage, videoLanguage,   productAnalysis: analysis });
+      const result = await api.generateStrategy({ language: contentLanguage, contentLanguage, videoLanguage, productAnalysis: analysis });
       setStrategy(result);
       setStep('script');
     } catch (err) {
@@ -89,7 +90,7 @@ export function CreativeStudioPage() {
     setError(null);
     setLoading(true);
     try {
-      const result = await api.generateScript({ language: contentLanguage, contentLanguage, videoLanguage,  
+      const result = await api.generateScript({ language: contentLanguage, contentLanguage, videoLanguage,
         productAnalysis: analysis,
         creativeStrategy: strategy,
       });
@@ -107,7 +108,7 @@ export function CreativeStudioPage() {
     setError(null);
     setLoading(true);
     try {
-      const result = await api.generateStoryboard({ language: contentLanguage, contentLanguage, videoLanguage,  
+      const result = await api.generateStoryboard({ language: contentLanguage, contentLanguage, videoLanguage,
         adScript: script,
         creativeStrategy: strategy,
       });
@@ -125,7 +126,7 @@ export function CreativeStudioPage() {
     setError(null);
     setLoading(true);
     try {
-      const result = await api.recommendTemplate({ language: contentLanguage, contentLanguage, videoLanguage,  
+      const result = await api.recommendTemplate({ language: contentLanguage, contentLanguage, videoLanguage,
         productAnalysis: analysis,
         creativeStrategy: strategy,
         limit: 5,
@@ -149,7 +150,7 @@ export function CreativeStudioPage() {
     setLoading(true);
     setJob(null);
     try {
-      const result = await api.generateVideo({ 
+      const result = await api.generateVideo({
         projectId,
         templateId: selectedTemplateId ?? undefined,
         aspectRatio: storyboard.aspectRatio,
@@ -260,38 +261,19 @@ export function CreativeStudioPage() {
           ))}
         </div>
 
-        {error && (
-          <Alert variant="error">{error}</Alert>
-        )}
+        {error && <Alert variant="error">{error}</Alert>}
 
         {step === 'product' && (
           <Card>
-            <CardHeader>
-              <CardTitle>1. Product</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>1. Product</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={analyzeProduct} className="space-y-4">
-                <Input
-                  label={t('common.productName')}
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  required
-                />
+                <Input label={t('common.productName')} value={productName} onChange={(e) => setProductName(e.target.value)} required />
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Description
-                  </label>
-                  <textarea
-                    className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    rows={4}
-                    value={productDescription}
-                    onChange={(e) => setProductDescription(e.target.value)}
-                    required
-                  />
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Description</label>
+                  <textarea className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={4} value={productDescription} onChange={(e) => setProductDescription(e.target.value)} required />
                 </div>
-                <Button type="submit" loading={loading}>
-                  Analyze product
-                </Button>
+                <Button type="submit" loading={loading}>Analyze product</Button>
               </form>
             </CardContent>
           </Card>
@@ -299,139 +281,83 @@ export function CreativeStudioPage() {
 
         {analysis && step !== 'product' && (
           <Card>
-            <CardHeader>
-              <CardTitle>{t('ai.productColon')} {analysis.productName}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-slate-700">
-              {analysis.shortDescription}
-            </CardContent>
+            <CardHeader><CardTitle>{t('ai.productColon')} {analysis.productName}</CardTitle></CardHeader>
+            <CardContent className="text-sm text-slate-700">{analysis.shortDescription}</CardContent>
           </Card>
         )}
 
         {step === 'strategy' && analysis && (
           <Card>
-            <CardHeader>
-              <CardTitle>2. Creative Strategy</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={generateStrategy} loading={loading}>
-                Generate strategy
-              </Button>
-            </CardContent>
+            <CardHeader><CardTitle>2. Creative Strategy</CardTitle></CardHeader>
+            <CardContent><Button onClick={generateStrategy} loading={loading}>Generate strategy</Button></CardContent>
           </Card>
         )}
 
         {strategy && (
           <Card>
-            <CardHeader>
-              <CardTitle>{t('creative.strategy')}</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>{t('creative.strategy')}</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <p>
-                <strong>{t('creative.hookColon')}</strong> {strategy.hook}
-              </p>
-              <p>
-                <strong>{t('creative.angleColon')}</strong> {strategy.creativeAngle}
-              </p>
-              <p>
-                <strong>{t('creative.messageColon')}</strong> {strategy.keyMessage}
-              </p>
-              <p>
-                <strong>{t('creative.durationColon')}</strong> {strategy.suggestedDuration}s · {strategy.suggestedAspectRatio}
-              </p>
-              {step === 'script' && (
-                <Button className="mt-2" onClick={generateScript} loading={loading}>
-                  {t('creative.generateScript')}
-                </Button>
-              )}
+              <p><strong>{t('creative.hookColon')}</strong> {strategy.hook}</p>
+              <p><strong>{t('creative.angleColon')}</strong> {strategy.creativeAngle}</p>
+              <p><strong>{t('creative.messageColon')}</strong> {strategy.keyMessage}</p>
+              <p><strong>{t('creative.durationColon')}</strong> {strategy.suggestedDuration}s · {strategy.suggestedAspectRatio}</p>
+              {step === 'script' && <Button className="mt-2" onClick={generateScript} loading={loading}>{t('creative.generateScript')}</Button>}
             </CardContent>
           </Card>
         )}
 
         {script && (
           <Card>
-            <CardHeader>
-              <CardTitle>Script ({script.duration}s)</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Script ({script.duration}s)</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm">
               {script.scenes.map((s) => (
                 <div key={s.order} className="rounded border border-slate-100 p-3">
-                  <p className="font-medium">
-                    Scene {s.order} · {s.duration}s
-                  </p>
+                  <p className="font-medium">Scene {s.order} · {s.duration}s</p>
                   <p className="text-slate-600">{s.narration}</p>
                   <p className="text-slate-500">{s.visualDescription}</p>
                 </div>
               ))}
-              {step === 'storyboard' && (
-                <Button onClick={generateStoryboard} loading={loading}>
-                  {t('creative.generateStoryboard')}
-                </Button>
-              )}
+              {step === 'storyboard' && <Button onClick={generateStoryboard} loading={loading}>{t('creative.generateStoryboard')}</Button>}
             </CardContent>
           </Card>
         )}
 
         {storyboard && (
           <Card>
-            <CardHeader>
-              <CardTitle>{t('creative.storyboard')}</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>{t('creative.storyboard')}</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm">
               {storyboard.scenes.map((s) => (
                 <div key={s.sceneId} className="rounded border border-slate-100 p-3">
-                  <p className="font-medium">
-                    #{s.order} · {s.duration}s · {s.cameraDirection}
-                  </p>
+                  <p className="font-medium">#{s.order} · {s.duration}s · {s.cameraDirection}</p>
                   <p className="text-slate-600">{s.visualPrompt}</p>
                 </div>
               ))}
-              {step === 'template' && (
-                <Button onClick={recommendTemplates} loading={loading}>
-                  Recommend templates
-                </Button>
-              )}
+              {step === 'template' && <Button onClick={recommendTemplates} loading={loading}>Recommend templates</Button>}
             </CardContent>
           </Card>
         )}
 
         {recommendations.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle>{t('creative.templateRecommendations')}</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>{t('creative.templateRecommendations')}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {recommendations.map((r) => (
                 <button
                   key={r.templateId}
                   type="button"
                   onClick={() => setSelectedTemplateId(r.templateId)}
-                  className={`w-full rounded-lg border p-3 text-start text-sm ${
-                    selectedTemplateId === r.templateId
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-slate-200'
-                  }`}
+                  className={`w-full rounded-lg border p-3 text-start text-sm ${selectedTemplateId === r.templateId ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{r.name ?? r.templateId}</span>
-                    <Badge variant={r.fit === 'excellent' ? 'success' : 'default'}>
-                      {r.fit} · {Math.round(r.score * 100)}%
-                    </Badge>
+                    <Badge variant={r.fit === 'excellent' ? 'success' : 'default'}>{r.fit} · {Math.round(r.score * 100)}%</Badge>
                   </div>
                   <p className="mt-1 text-slate-500">{r.reason}</p>
                 </button>
               ))}
               <form onSubmit={startVideo} className="space-y-3 pt-2">
-                <Input
-                  label="Project ID (UUID from your workspace)"
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                  required
-                  hint={t('creative.projectIdHint')}
-                />
-                <Button type="submit" loading={loading}>
-                  Generate video
-                </Button>
+                <Input label="Project ID (UUID from your workspace)" value={projectId} onChange={(e) => setProjectId(e.target.value)} required hint={t('creative.projectIdHint')} />
+                <Button type="submit" loading={loading}>Generate video</Button>
               </form>
             </CardContent>
           </Card>
@@ -439,47 +365,37 @@ export function CreativeStudioPage() {
 
         {job && (
           <Card>
-            <CardHeader>
-              <CardTitle>{t('creative.videoGenerationJob')}</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>{t('creative.videoGenerationJob')}</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex flex-wrap gap-2">
-                <Badge
-                  variant={
-                    job.status === 'completed'
-                      ? 'success'
-                      : job.status === 'failed'
-                        ? 'danger'
-                        : 'info'
-                  }
-                >
-                  {job.status}
-                </Badge>
+                <Badge variant={job.status === 'completed' ? 'success' : job.status === 'failed' ? 'danger' : 'info'}>{job.status}</Badge>
                 {job.progress !== null && <Badge variant="default">{job.progress}%</Badge>}
               </div>
               <p className="text-slate-600">Job ID: {job.id}</p>
               {job.error && <Alert variant="error">{job.error}</Alert>}
-              {job.outputUrl && (
+
+              {job.status === 'completed' && (job.assetId || job.outputUrl) && (
+                <VideoResultCard
+                  title={t('video.generatedAd')}
+                  videoUrl={job.outputUrl}
+                  assetId={job.assetId}
+                  status={job.status}
+                  createdAt={job.completedAt || job.updatedAt}
+                />
+              )}
+
+              {job.status !== 'completed' && job.outputUrl && (
                 <div>
                   <p className="mb-2 font-medium">{t('common.output')}</p>
-                  <video src={job.outputUrl} controls className="max-h-80 w-full rounded-lg bg-black" />
-                  <a
-                    href={job.outputUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2 inline-block text-indigo-600"
-                  >
-                    {t('library.openVideo')}
-                  </a>
+                  <video src={job.outputUrl} controls playsInline className="max-h-80 w-full rounded-lg bg-black" />
                 </div>
               )}
-              {(job.status === 'queued' || job.status === 'processing') && (
+
+              {(job.status === 'queued' || job.status === 'processing' || job.status === 'composing' || job.status === 'rendering') && (
                 <div className="flex items-center gap-3">
                   <Spinner size="sm" />
                   <span className="text-slate-500">{t('creative.pollingStatus')}</span>
-                  <Button variant="outline" size="sm" onClick={cancelJob}>
-                    Cancel
-                  </Button>
+                  <Button variant="outline" size="sm" onClick={cancelJob}>Cancel</Button>
                 </div>
               )}
             </CardContent>
@@ -487,9 +403,7 @@ export function CreativeStudioPage() {
         )}
 
         {loading && step !== 'product' && (
-          <div className="flex justify-center py-4">
-            <Spinner />
-          </div>
+          <div className="flex justify-center py-4"><Spinner /></div>
         )}
       </main>
     </div>
