@@ -28,11 +28,6 @@ export class PayPalWebhookService {
     headers: Record<string, string | string[] | undefined>,
   ): Promise<{ received: true; duplicate?: boolean }> {
     const bodyStr = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : rawBody;
-    const valid = await verifyPayPalWebhook(headers, bodyStr);
-    if (!valid) {
-      throw new AppError('PayPal webhook verification failed', 400, 'PAYPAL_WEBHOOK_INVALID');
-    }
-
     let event: PayPalWebhookEvent;
     try {
       event = JSON.parse(bodyStr) as PayPalWebhookEvent;
@@ -41,6 +36,11 @@ export class PayPalWebhookService {
     }
     if (!event.id || !event.event_type || !event.resource || typeof event.resource !== 'object') {
       throw new AppError('Invalid PayPal webhook payload', 400, 'PAYPAL_WEBHOOK_INVALID');
+    }
+
+    const valid = await verifyPayPalWebhook(headers, bodyStr);
+    if (!valid) {
+      throw new AppError('PayPal webhook verification failed', 400, 'PAYPAL_WEBHOOK_INVALID');
     }
 
     // Atomic idempotency: UNIQUE(paypal_event_id). Insert first to claim the event.
@@ -61,7 +61,6 @@ export class PayPalWebhookService {
     try {
       await this.dispatch(event);
     } catch (err) {
-      // Allow PayPal to retry: un-claim the event so a later delivery can reprocess.
       try {
         await this.db
           .delete(paypalWebhookEvents)
@@ -119,8 +118,6 @@ export class PayPalWebhookService {
       await paypalRequest('POST', `/v2/checkout/orders/${orderId}/capture`, {});
       log('paypal_order_captured', { orderId });
     } catch (err) {
-      // PayPal can redeliver an approval after a successful capture. Confirm the
-      // remote state before deciding whether this delivery should be retried.
       try {
         const current = await paypalRequest<{ status?: string }>('GET', `/v2/checkout/orders/${orderId}`);
         if (String(current.status || '').toUpperCase() === 'COMPLETED') {
@@ -142,7 +139,6 @@ export class PayPalWebhookService {
       return;
     }
 
-    // format: workspaceId|userId|credits|pkg|creditsAmount
     const parts = customId.split('|');
     if (parts.length >= 5 && parts[2] === 'credits') {
       const workspaceId = parts[0]!;
@@ -253,13 +249,7 @@ export class PayPalWebhookService {
     if (grantCredits && mapped === 'active') {
       const credits = PLAN_META[planKey].includedCredits;
       if (credits > 0) {
-        await this.claimPeriodGrant({
-          workspaceId,
-          subId,
-          credits,
-          planKey,
-          periodKey: now.toISOString(),
-        });
+        await this.claimPeriodGrant({ workspaceId, subId, credits, planKey, periodKey: now.toISOString() });
       }
     }
   }
@@ -319,8 +309,7 @@ export class PayPalWebhookService {
       log('paypal_sale_cycle_already_granted', { billingAgreementId, workspaceId: sub.workspaceId });
       return;
     }
-    const planKey =
-      (Object.keys(PLAN_IDS) as PlanKey[]).find((k) => PLAN_IDS[k] === sub.planId) || 'starter';
+    const planKey = (Object.keys(PLAN_IDS) as PlanKey[]).find((k) => PLAN_IDS[k] === sub.planId) || 'starter';
     const credits = PLAN_META[planKey]?.includedCredits ?? 0;
     if (credits <= 0) return;
     const now = new Date();
@@ -351,11 +340,7 @@ export class PayPalWebhookService {
         referenceId: `${billingAgreementId}:${now.toISOString()}`,
         idempotencyKey: `paypal:subscription:${billingAgreementId}:${now.toISOString()}`,
       });
-      log('paypal_subscription_renewal_credits', {
-        workspaceId: sub.workspaceId,
-        credits,
-        billingAgreementId,
-      });
+      log('paypal_subscription_renewal_credits', { workspaceId: sub.workspaceId, credits, billingAgreementId });
     });
   }
 
@@ -363,21 +348,13 @@ export class PayPalWebhookService {
     const subId = String(resource.id || '');
     await this.db
       .update(subscriptions)
-      .set({
-        status: 'canceled',
-        canceledAt: new Date(),
-        cancelAtPeriodEnd: false,
-        updatedAt: new Date(),
-      })
+      .set({ status: 'canceled', canceledAt: new Date(), cancelAtPeriodEnd: false, updatedAt: new Date() })
       .where(eq(subscriptions.externalId, subId));
   }
 
   private async onSubscriptionStatus(resource: Record<string, unknown>, status: string): Promise<void> {
     const subId = String(resource.id || '');
-    await this.db
-      .update(subscriptions)
-      .set({ status, updatedAt: new Date() })
-      .where(eq(subscriptions.externalId, subId));
+    await this.db.update(subscriptions).set({ status, updatedAt: new Date() }).where(eq(subscriptions.externalId, subId));
   }
 
   private async ownerOf(workspaceId: string): Promise<string> {
