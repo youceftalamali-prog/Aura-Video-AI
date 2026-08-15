@@ -8,6 +8,7 @@ import { StoryboardService } from '../creative/services/storyboard.service.js';
 import { TemplateService } from '../creative/services/template.service.js';
 import { CreditLedgerService } from '../video/services/credit-ledger.service.js';
 import { ProductRepository } from './services/product.repository.js';
+import { ProductIntelligenceRepository, DbProductIntelligenceRepository } from './services/product-intelligence.repository.js';
 import { UrlImportService } from './services/url-import.service.js';
 import { ProductIntelligenceService } from './services/product-intelligence.service.js';
 import { ProductService } from './services/product.service.js';
@@ -26,6 +27,7 @@ export function createProductsModule() {
   const templates = new TemplateService(db);
   const credits = new CreditLedgerService(db);
   const repo = new ProductRepository(db);
+  const intelligenceRepo: ProductIntelligenceRepository = new DbProductIntelligenceRepository(db);
   const urlImport = new UrlImportService();
   const service = new ProductService(
     repo,
@@ -37,6 +39,7 @@ export function createProductsModule() {
     storyboard,
     templates,
     credits,
+    intelligenceRepo,
   );
   const controller = new ProductsController(service, db);
   const routes = createProductsRoutes(controller);

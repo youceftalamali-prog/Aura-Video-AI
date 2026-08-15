@@ -5,6 +5,7 @@ import {
   importUrlSchema,
   importTextSchema,
   importImageSchema,
+  refreshIntelligenceSchema,
   createVideoFromProductSchema,
 } from '../dto/schemas.js';
 import type { ApiResponse } from '@aura/types';
@@ -53,7 +54,7 @@ export class ProductsController {
     try {
       const body = importUrlSchema.parse(req.body);
       const workspaceId = await this.workspaceId(req.user!.sub);
-      const data = await this.products.importUrl(req.user!.sub, workspaceId, body.url);
+      const data = await this.products.importUrl(req.user!.sub, workspaceId, body.url, body.strategy);
       res.status(201).json({ success: true, data } satisfies ApiResponse);
     } catch (e) { next(e); }
   };
@@ -83,9 +84,18 @@ export class ProductsController {
     } catch (e) { next(e); }
   };
 
+  refreshIntelligence = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const body = refreshIntelligenceSchema.parse(req.body ?? {});
+      const data = await this.products.refreshIntelligence(req.user!.sub, req.params.id as string, body.strategy);
+      res.status(200).json({ success: true, data } satisfies ApiResponse);
+    } catch (e) { next(e); }
+  };
+
   hooks = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const data = await this.products.generateHooks(req.user!.sub, req.params.id as string);
+      const body = refreshIntelligenceSchema.parse(req.body ?? {});
+      const data = await this.products.generateHooks(req.user!.sub, req.params.id as string, body.strategy);
       res.json({ success: true, data } satisfies ApiResponse);
     } catch (e) { next(e); }
   };

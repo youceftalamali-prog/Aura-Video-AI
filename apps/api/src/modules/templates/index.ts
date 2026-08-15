@@ -3,6 +3,7 @@ import { getAIProvider, getUrlMetadataExtractor } from '../ai/providers/index.js
 import { getAIGateway } from '../ai/gateway/index.js';
 import { ProductAnalysisService } from '../ai/services/product-analysis.service.js';
 import { ProductRepository } from '../products/services/product.repository.js';
+import { ProductIntelligenceRepository, DbProductIntelligenceRepository } from '../products/services/product-intelligence.repository.js';
 import { UrlImportService } from '../products/services/url-import.service.js';
 import { ProductIntelligenceService } from '../products/services/product-intelligence.service.js';
 import { ProductService } from '../products/services/product.service.js';
@@ -37,6 +38,7 @@ export function createTemplatesModule() {
     storyboard,
     templates,
     credits,
+    new DbProductIntelligenceRepository(db),
   );
   const brandKit = new BrandKitService(db);
   const library = new TemplateLibraryService(db, productService, strategy, script, storyboard, brandKit);
