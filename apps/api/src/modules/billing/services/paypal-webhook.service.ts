@@ -1,4 +1,4 @@
-import { eq, and, or, lte } from 'drizzle-orm';
+import { eq, and, or, lte, desc } from 'drizzle-orm';
 import type { Database } from '../../../db/client.js';
 import { subscriptions, paypalWebhookEvents, workspaces } from '../../../db/schema.js';
 import { AppError } from '@aura/shared';
@@ -33,8 +33,13 @@ export class PayPalWebhookService {
       throw new AppError('PayPal webhook verification failed', 400, 'PAYPAL_WEBHOOK_INVALID');
     }
 
-    const event = JSON.parse(bodyStr) as unknown as PayPalWebhookEvent;
-    if (!event.id || !event.event_type) {
+    let event: PayPalWebhookEvent;
+    try {
+      event = JSON.parse(bodyStr) as PayPalWebhookEvent;
+    } catch {
+      throw new AppError('Invalid PayPal webhook payload', 400, 'PAYPAL_WEBHOOK_INVALID');
+    }
+    if (!event.id || !event.event_type || !event.resource || typeof event.resource !== 'object') {
       throw new AppError('Invalid PayPal webhook payload', 400, 'PAYPAL_WEBHOOK_INVALID');
     }
 
@@ -45,7 +50,6 @@ export class PayPalWebhookService {
         eventType: event.event_type,
       });
     } catch (err) {
-      // Treat unique violations as duplicates; rethrow unexpected DB errors
       const msg = String((err as unknown as Error)?.message || err);
       if (/unique|duplicate|23505/i.test(msg)) {
         log('paypal_webhook_duplicate', { eventId: event.id, type: event.event_type });
@@ -57,7 +61,7 @@ export class PayPalWebhookService {
     try {
       await this.dispatch(event);
     } catch (err) {
-      // Allow PayPal to retry: un-claim the event so a later delivery can reprocess
+      // Allow PayPal to retry: un-claim the event so a later delivery can reprocess.
       try {
         await this.db
           .delete(paypalWebhookEvents)
@@ -111,53 +115,64 @@ export class PayPalWebhookService {
   private async onOrderApproved(resource: Record<string, unknown>): Promise<void> {
     const orderId = String(resource.id || '');
     if (!orderId) return;
-    // Capture the order server-side; grant happens on CAPTURE.COMPLETED
     try {
       await paypalRequest('POST', `/v2/checkout/orders/${orderId}/capture`, {});
       log('paypal_order_captured', { orderId });
     } catch (err) {
-      log('paypal_order_capture_failed', { orderId, error: (err as unknown as Error).message });
+      // PayPal can redeliver an approval after a successful capture. Confirm the
+      // remote state before deciding whether this delivery should be retried.
+      try {
+        const current = await paypalRequest<{ status?: string }>('GET', `/v2/checkout/orders/${orderId}`);
+        if (String(current.status || '').toUpperCase() === 'COMPLETED') {
+          log('paypal_order_already_captured', { orderId });
+          return;
+        }
+      } catch {
+        /* preserve the original capture error */
+      }
+      throw err;
     }
   }
 
   private async onCaptureCompleted(resource: Record<string, unknown>): Promise<void> {
     let customId = String(resource.custom_id || '');
-    if (!customId) {
-      customId = await this.resolveCustomIdFromCapture(resource);
-    }
+    if (!customId) customId = await this.resolveCustomIdFromCapture(resource);
     if (!customId) {
       log('paypal_capture_no_custom_id', { captureId: resource.id });
       return;
     }
+
     // format: workspaceId|userId|credits|pkg|creditsAmount
     const parts = customId.split('|');
     if (parts.length >= 5 && parts[2] === 'credits') {
       const workspaceId = parts[0]!;
-      const pkg = parts[3] as unknown as CreditPackageKey;
-      const credits = Number(parts[4]) || CREDIT_PACKAGES[pkg]?.credits;
-      if (!credits) {
+      const pkg = parts[3] as CreditPackageKey;
+      const expected = CREDIT_PACKAGES[pkg];
+      const declaredCredits = Number(parts[4]);
+      if (!expected || declaredCredits !== expected.credits) {
         throw new AppError('Invalid credit package in PayPal custom_id', 400, 'INVALID_CREDIT_PACKAGE');
       }
       const captureId = String(resource.id || 'unknown');
-      await this.ledger.grant(workspaceId, credits, {
+      await this.ledger.grant(workspaceId, expected.credits, {
         description: 'PayPal credit purchase',
         referenceType: 'paypal_capture',
         referenceId: captureId,
         idempotencyKey: `paypal:capture:${captureId}`,
       });
-      log('paypal_credits_granted', { workspaceId, credits, captureId: resource.id });
+      log('paypal_credits_granted', { workspaceId, credits: expected.credits, captureId: resource.id });
     }
   }
 
   private async resolveCustomIdFromCapture(resource: Record<string, unknown>): Promise<string> {
-    const supplementary = resource.supplementary_data as unknown as Record<string, unknown> | undefined;
-    const related = supplementary?.related_ids as unknown as Record<string, unknown> | undefined;
+    const supplementary = resource.supplementary_data as Record<string, unknown> | undefined;
+    const related = supplementary?.related_ids as Record<string, unknown> | undefined;
     const orderId = related?.order_id ? String(related.order_id) : '';
     if (!orderId) return '';
     try {
-      const order = await paypalRequest<{
-        purchase_units?: Array<{ custom_id?: string }>;
-      }>('GET', `/v2/checkout/orders/${orderId}`);
+      const order = await paypalRequest<{ purchase_units?: Array<{ custom_id?: string }> }>(
+        'GET',
+        `/v2/checkout/orders/${orderId}`,
+      );
       return String(order.purchase_units?.[0]?.custom_id || '');
     } catch {
       return '';
@@ -168,20 +183,23 @@ export class PayPalWebhookService {
     const subId = String(resource.id || '');
     let custom: { workspaceId?: string; userId?: string; planId?: string } = {};
     try {
-      custom = JSON.parse(String(resource.custom_id || '{}'));
+      custom = JSON.parse(String(resource.custom_id || '{}')) as typeof custom;
     } catch {
       custom = {};
     }
-    let workspaceId = custom.workspaceId;
+    const workspaceId = custom.workspaceId;
     const userId = custom.userId;
-    const planKey = (custom.planId as unknown as PlanKey) || 'starter';
+    const planKey = custom.planId as PlanKey | undefined;
 
     if (!workspaceId) {
       log('paypal_subscription_no_workspace', { subscriptionId: subId });
       return;
     }
+    if (!planKey || !(planKey in PLAN_IDS)) {
+      throw new AppError('Invalid PayPal subscription plan', 400, 'INVALID_BILLING_PLAN');
+    }
 
-    const planUuid = PLAN_IDS[planKey] || PLAN_IDS.starter;
+    const planUuid = PLAN_IDS[planKey];
     const status = String(resource.status || 'ACTIVE').toLowerCase();
     const mapped =
       status === 'active'
@@ -198,6 +216,7 @@ export class PayPalWebhookService {
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.workspaceId, workspaceId))
+      .orderBy(desc(subscriptions.updatedAt), desc(subscriptions.createdAt))
       .limit(1);
 
     const sameSubscription = existing[0]?.externalId === subId;
@@ -210,13 +229,8 @@ export class PayPalWebhookService {
           planId: planUuid,
           status: mapped,
           externalId: subId,
-          // Mid-cycle syncs (same subscription, credits already granted) keep the
-          // billing period; only a fresh subscription or the initial activation
-          // (re)starts the period.
           currentPeriodStart: sameSubscription && alreadyGranted ? existing[0].currentPeriodStart : now,
           currentPeriodEnd: sameSubscription && alreadyGranted ? existing[0].currentPeriodEnd : periodEnd,
-          // A different external id means a new billing agreement: reset the
-          // per-period flag so the new initial grant can be claimed.
           periodCreditsGranted: sameSubscription ? alreadyGranted : false,
           updatedAt: now,
         })
@@ -237,7 +251,7 @@ export class PayPalWebhookService {
     log('paypal_subscription_synced', { workspaceId, subId, status: mapped });
 
     if (grantCredits && mapped === 'active') {
-      const credits = PLAN_META[planKey]?.includedCredits ?? 0;
+      const credits = PLAN_META[planKey].includedCredits;
       if (credits > 0) {
         await this.claimPeriodGrant({
           workspaceId,
@@ -250,12 +264,6 @@ export class PayPalWebhookService {
     }
   }
 
-  /**
-   * Idempotent "credits granted for billing period" safeguard.
-   * Claims the period with a conditional UPDATE (period_credits_granted false ->
-   * true) and grants inside the same transaction: exactly one grant per billing
-   * period per subscription, even with duplicate/out-of-order deliveries.
-   */
   private async claimPeriodGrant(input: {
     workspaceId: string;
     subId: string;
@@ -291,10 +299,7 @@ export class PayPalWebhookService {
   }
 
   private async onSubscriptionPayment(resource: Record<string, unknown>): Promise<void> {
-    // Subscription renewal payment — custom may include billing_agreement_id
-    const billingAgreementId = String(
-      resource.billing_agreement_id || resource.billing_agreement || '',
-    );
+    const billingAgreementId = String(resource.billing_agreement_id || resource.billing_agreement || '');
     if (!billingAgreementId) {
       log('paypal_sale_no_agreement', { id: resource.id });
       return;
@@ -303,15 +308,13 @@ export class PayPalWebhookService {
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.externalId, billingAgreementId))
+      .orderBy(desc(subscriptions.updatedAt), desc(subscriptions.createdAt))
       .limit(1);
     const sub = rows[0];
     if (!sub?.workspaceId) {
       log('paypal_sale_unknown_subscription', { billingAgreementId });
       return;
     }
-    // The first billing cycle is granted by BILLING.SUBSCRIPTION.ACTIVATED; the
-    // initial PAYMENT.SALE.COMPLETED arrives inside that same period and must not
-    // grant again. Renewal sales fall outside the current period and grant below.
     if (sub.periodCreditsGranted && new Date() < sub.currentPeriodEnd) {
       log('paypal_sale_cycle_already_granted', { billingAgreementId, workspaceId: sub.workspaceId });
       return;
