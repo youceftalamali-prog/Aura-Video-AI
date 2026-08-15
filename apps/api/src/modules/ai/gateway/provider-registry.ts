@@ -13,7 +13,7 @@ export type ProviderAvailability =
  * The first registered provider (or an explicitly marked default) is used
  * when no provider name is requested. Availability distinguishes configured,
  * enabled, disabled, missing-key and invalid states; routing only considers
- * providers that are not disabled/invalid.
+ * providers in the enabled state.
  */
 export class ProviderRegistry {
   private readonly providers = new Map<string, IAIProvider>();
@@ -50,10 +50,9 @@ export class ProviderRegistry {
     return this.availability.get(name) ?? 'not-configured';
   }
 
-  /** Providers that routing may select: not disabled, not invalid. */
+  /** Providers that routing may select: only explicitly enabled providers. */
   isRoutable(name: string): boolean {
-    const state = this.availabilityOf(name);
-    return state !== 'disabled' && state !== 'invalid';
+    return this.availabilityOf(name) === 'enabled';
   }
 
   all(): IAIProvider[] {
