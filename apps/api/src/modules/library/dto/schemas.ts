@@ -13,6 +13,6 @@ export const updateProjectBodySchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
   status: z.literal('archived').optional(),
-});
+}).strict();
 
 export const assetTypeSchema = z.enum(['image', 'video', 'audio', 'document', 'other']);

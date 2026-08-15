@@ -21,7 +21,7 @@ export class AssetRepository {
   }
 
   async listByUser(userId: string, type?: string, limit = 50): Promise<Asset[]> {
-    const conditions = [and(eq(assets.userId, userId), ne(assets.status, 'deleted'))];
+    const conditions = [eq(assets.userId, userId), ne(assets.status, 'deleted')];
     if (type) conditions.push(eq(assets.type, type));
     const rows = await this.db
       .select()
@@ -33,7 +33,7 @@ export class AssetRepository {
   }
 
   async listByWorkspace(workspaceId: string, type?: string, limit = 50): Promise<Asset[]> {
-    const conditions = [and(eq(assets.workspaceId, workspaceId), ne(assets.status, 'deleted'))];
+    const conditions = [eq(assets.workspaceId, workspaceId), ne(assets.status, 'deleted')];
     if (type) conditions.push(eq(assets.type, type));
     const rows = await this.db
       .select()
