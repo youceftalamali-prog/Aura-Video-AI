@@ -12,6 +12,7 @@
     "test:security": "tsx scripts/security-deterministic-test.ts",
     "test:ai-gateway": "tsx scripts/ai-gateway-deterministic-test.ts",
     "test:product-intelligence": "tsx scripts/product-intelligence-deterministic-test.ts",
+    "test:runtime": "tsx scripts/runtime-infrastructure-test.ts",
     "test:library": "tsx scripts/library-deterministic-test.ts",
     "test:billing": "tsx scripts/billing-deterministic-test.ts",
     "test:paypal": "tsx scripts/paypal-deterministic-test.ts",
