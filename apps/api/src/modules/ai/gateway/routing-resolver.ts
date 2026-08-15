@@ -58,6 +58,42 @@ export class RoutingResolver {
     }));
   }
 
+  /**
+   * Ranks models for an already-resolved provider instance. This is used for
+   * workspace-scoped provider configs that are not registered globally.
+   */
+  rankForProvider(
+    strategy: RoutingStrategy,
+    capability: AICapability,
+    providerId: string,
+    provider: IAIProvider,
+    modelId?: string,
+  ): ResolvedCandidate[] {
+    const descriptors = this.models
+      .list()
+      .filter((descriptor) => descriptor.provider === providerId && descriptor.capabilities.includes(capability));
+
+    if (modelId) {
+      const descriptor = descriptors.find((item) => item.id === modelId);
+      if (!descriptor) {
+        throw new AppError(
+          `Model "${modelId}" is not available for capability "${capability}"`,
+          503,
+          'AI_MODEL_UNAVAILABLE',
+        );
+      }
+      return [{ provider, modelId: descriptor.id }];
+    }
+
+    if (descriptors.length === 0) {
+      throw new AppError(`Provider "${providerId}" does not support capability "${capability}"`, 503, 'AI_PROVIDER_UNAVAILABLE');
+    }
+
+    return [...descriptors]
+      .sort(comparatorFor(strategy, capability, this.defaultModelId))
+      .map((descriptor) => ({ provider, modelId: descriptor.id }));
+  }
+
   private rankExplicit(capability: AICapability, options: ResolveOptions): ResolvedCandidate[] {
     const descriptor = this.models.resolve(options.modelId!);
     if (!descriptor || !descriptor.capabilities.includes(capability)) {
@@ -73,6 +109,9 @@ export class RoutingResolver {
         503,
         'AI_MODEL_UNAVAILABLE',
       );
+    }
+    if (!this.providers.isRoutable(descriptor.provider)) {
+      throw new AppError(`Provider "${descriptor.provider}" is unavailable`, 503, 'AI_PROVIDER_UNAVAILABLE');
     }
     return [{ provider: this.providers.get(descriptor.provider), modelId: descriptor.id }];
   }

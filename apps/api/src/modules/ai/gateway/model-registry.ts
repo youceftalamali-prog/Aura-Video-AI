@@ -20,6 +20,7 @@ export class ModelRegistry {
   private lastError: string | null = null;
   private refreshPromise: Promise<ModelDescriptor[]> | null = null;
   private allowlistByProvider: Map<string, Set<string>> | null = null;
+  private allowlistConfigured = false;
 
   register(descriptor: ModelDescriptor): void {
     this.staticModels.set(descriptor.id, descriptor);
@@ -41,7 +42,11 @@ export class ModelRegistry {
     return this.source !== null;
   }
 
-  /** Applies the administrator's persisted allowlist. Providers without rows remain unrestricted. */
+  /**
+   * Applies the administrator's persisted allowlist. Once the repository has
+   * been consulted, an empty list means deny by default; a provider without an
+   * allowlist row is not implicitly trusted.
+   */
   setAllowlist(entries: Array<{ providerId: string; modelId: string }>): void {
     const next = new Map<string, Set<string>>();
     for (const entry of entries) {
@@ -49,12 +54,13 @@ export class ModelRegistry {
       models.add(entry.modelId);
       next.set(entry.providerId, models);
     }
-    this.allowlistByProvider = next.size > 0 ? next : null;
+    this.allowlistConfigured = true;
+    this.allowlistByProvider = next;
   }
 
   isAllowed(descriptor: ModelDescriptor): boolean {
-    const providerAllowlist = this.allowlistByProvider?.get(descriptor.provider);
-    return !providerAllowlist || providerAllowlist.has(descriptor.id);
+    if (!this.allowlistConfigured) return true;
+    return this.allowlistByProvider?.get(descriptor.provider)?.has(descriptor.id) ?? false;
   }
 
   /** Forces a catalog refresh (coalesced when already in flight). */
@@ -146,6 +152,7 @@ export class ModelRegistry {
     refreshedAt: number | null;
     ttlMs: number;
     lastError: string | null;
+    allowlistConfigured: boolean;
   } {
     return {
       staticCount: this.staticModels.size,
@@ -155,6 +162,7 @@ export class ModelRegistry {
       refreshedAt: this.refreshedAt,
       ttlMs: this.ttlMs,
       lastError: this.lastError,
+      allowlistConfigured: this.allowlistConfigured,
     };
   }
 }

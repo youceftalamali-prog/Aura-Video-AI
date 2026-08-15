@@ -29,15 +29,6 @@ export interface ExecuteOptions {
 /**
  * Central AI gateway. Implements IAIProvider so existing services can keep
  * their current call sites while routing through the gateway.
- *
- * Phase B: per-request `modelId` (via params), `providerId`/`strategy`
- * (via options), and a single retry with the next-ranked candidate — only for
- * automatic routing (no explicit modelId/providerId). An explicit modelId is
- * never silently substituted; unknown models raise AI_MODEL_UNAVAILABLE.
- *
- * Phase C: runtime provider configuration. DB system-scope configs are synced
- * into the registry on first use; workspace-scoped configs are resolved per
- * call (provider + workspaceId -> effective configuration).
  */
 export class AIGateway implements IAIProvider {
   readonly name = 'gateway';
@@ -92,16 +83,12 @@ export class AIGateway implements IAIProvider {
     );
   }
 
-  // ===== Phase C: runtime provider configuration =====
-
-  /** Effective configuration for a provider at an optional workspace scope. */
   async getProviderConfig(providerId: string, workspaceId?: string | null): Promise<ProviderResolution | null> {
     await this.syncConfiguredProviders();
     if (!this.configService) return null;
     return this.configService.resolveFor(providerId, workspaceId ?? null);
   }
 
-  /** Provider instance bound to the effective configuration (null when unavailable). */
   async getProviderInstance(providerId: string, workspaceId?: string | null): Promise<IAIProvider | null> {
     const resolution = await this.getProviderConfig(providerId, workspaceId);
     if (!resolution || resolution.state !== 'enabled' || !resolution.apiKey) return null;
@@ -111,7 +98,6 @@ export class AIGateway implements IAIProvider {
     return this.providers.get(providerId);
   }
 
-  /** Safe model list for the public endpoint (no secrets and only allowed models). */
   async listModels(): Promise<ModelDescriptor[]> {
     await this.syncConfiguredProviders();
     await this.models.refreshIfStale();
@@ -119,7 +105,6 @@ export class AIGateway implements IAIProvider {
     return this.models.list();
   }
 
-  /** Forces a catalog refresh and returns the fresh, allowlisted model list (admin action). */
   async refreshModelsCatalog(): Promise<ModelDescriptor[]> {
     await this.syncConfiguredProviders();
     await this.models.refresh();
@@ -127,7 +112,6 @@ export class AIGateway implements IAIProvider {
     return this.models.list();
   }
 
-  /** Replaces the administrator's global allowlist for one provider. */
   async setAllowedModels(providerId: string, modelIds: string[]): Promise<ModelDescriptor[]> {
     if (!this.allowlistRepo) {
       throw new AppError('AI model allowlist is not configured', 503, 'AI_ALLOWLIST_UNAVAILABLE');
@@ -153,7 +137,6 @@ export class AIGateway implements IAIProvider {
     return this.models.list();
   }
 
-  /** Registry availability + model cache status (admin listing). */
   async getRegistryStatus(): Promise<{
     providers: Record<string, ProviderAvailability>;
     models: ReturnType<ModelRegistry['status']>;
@@ -167,7 +150,6 @@ export class AIGateway implements IAIProvider {
     return { providers, models: this.models.status() };
   }
 
-  /** Loads system-scope DB provider configs into the runtime registry (coalesced). */
   async syncConfiguredProviders(): Promise<void> {
     if (!this.configService) return;
     if (!this.syncPromise) {
@@ -177,8 +159,6 @@ export class AIGateway implements IAIProvider {
     }
     return this.syncPromise;
   }
-
-  // ===== internals =====
 
   private async doSync(): Promise<void> {
     const configs = await this.configService!.list(null);
@@ -255,15 +235,25 @@ export class AIGateway implements IAIProvider {
       if (!instance) {
         throw new AppError('No AI provider is configured', 503, 'AI_PROVIDER_UNAVAILABLE');
       }
-      let modelId: string | null = null;
+
+      let requestedModelId: string | undefined;
       if (params.modelId) {
         const descriptor = await this.models.resolveWithRefresh(params.modelId);
         if (!descriptor || descriptor.provider !== options.providerId) {
           throw new AppError(`Model "${params.modelId}" is not available`, 503, 'AI_MODEL_UNAVAILABLE');
         }
-        modelId = descriptor.id;
+        requestedModelId = descriptor.id;
+      } else {
+        await this.models.refreshIfStale();
       }
-      candidates = [{ provider: instance, modelId }];
+
+      candidates = this.resolver.rankForProvider(
+        strategy,
+        capability,
+        options.providerId,
+        instance,
+        requestedModelId,
+      );
     } else {
       if (params.modelId) {
         const descriptor = await this.models.resolveWithRefresh(params.modelId);
@@ -273,7 +263,7 @@ export class AIGateway implements IAIProvider {
       } else {
         await this.models.refreshIfStale();
       }
-      candidates = this.resolver.rank(strategy, capability, options);
+      candidates = this.resolver.rank(strategy, capability, { ...options, modelId: params.modelId });
     }
 
     const first = candidates[0]!;
