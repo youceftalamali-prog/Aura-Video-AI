@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { getEnv } from '@aura/config';
 import { AppError, NotFoundError, AuthorizationError } from '@aura/shared';
@@ -76,7 +77,15 @@ export class VideoGenerationService {
     }
 
     const estimate = this.credits.estimateCost({ duration: request.duration, sceneCount: request.scenes.length, mode });
-    await this.credits.deduct(project.workspaceId, estimate.credits);
+    const chargeReference = request.idempotencyKey ? `request:${request.idempotencyKey}` : randomUUID();
+    const chargeIdempotencyKey = `video:charge:${project.workspaceId}:${chargeReference}`;
+    await this.credits.deduct(project.workspaceId, estimate.credits, {
+      userId,
+      description: 'Video generation charge',
+      referenceType: 'video_generation',
+      referenceId: chargeReference,
+      idempotencyKey: chargeIdempotencyKey,
+    });
 
     const prompt = request.scenes.map((s) => s.visualPrompt).join('\n---\n');
     let job;
@@ -102,7 +111,13 @@ export class VideoGenerationService {
         },
       });
     } catch (err) {
-      await this.credits.refund(project.workspaceId, estimate.credits);
+      await this.credits.refund(project.workspaceId, estimate.credits, {
+        userId,
+        description: 'Refund for failed video job creation',
+        referenceType: 'video_generation_refund',
+        referenceId: chargeReference,
+        idempotencyKey: `video:refund:create:${chargeReference}`,
+      });
       throw err;
     }
 
@@ -182,12 +197,18 @@ export class VideoGenerationService {
         });
 
         if (remote.status === 'failed') {
-          await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, remote.error || 'Provider failed');
+          await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, remote.error || 'Provider failed', job.userId);
           return;
         }
         if (remote.status === 'canceled') {
           await this.jobs.update(jobId, { status: 'canceled', completedAt: new Date() });
-          await this.credits.refund(job.workspaceId, job.creditsCharged);
+          await this.credits.refund(job.workspaceId, job.creditsCharged, {
+            userId: job.userId,
+            description: 'Refund for canceled video generation',
+            referenceType: 'video_generation_refund',
+            referenceId: jobId,
+            idempotencyKey: `video:refund:${jobId}`,
+          });
           return;
         }
         if (remote.status === 'completed' && remote.outputUrl) {
@@ -197,7 +218,7 @@ export class VideoGenerationService {
       }
 
       if (!remoteUrl) {
-        await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, 'Video generation timed out');
+        await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, 'Video generation timed out', job.userId);
         throw new AppError('Video generation timed out', 504, 'VIDEO_GENERATION_TIMEOUT');
       }
 
@@ -237,7 +258,7 @@ export class VideoGenerationService {
       logEvent('generation_completed', { jobId, assetId, outputUrl: storageUrl });
     } catch (err) {
       const message = err instanceof AppError ? err.message : (err as unknown as Error).message;
-      await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, message);
+      await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, message, job.userId);
       logEvent('generation_failed', { jobId, error: message });
     }
   }
@@ -258,16 +279,30 @@ export class VideoGenerationService {
       await this.media.cancelJob(job.providerJobId);
     }
     if (job.creditsCharged > 0 && ACTIVE.includes(job.status)) {
-      await this.credits.refund(job.workspaceId, job.creditsCharged);
+      await this.credits.refund(job.workspaceId, job.creditsCharged, {
+        userId,
+        description: 'Refund for canceled video generation',
+        referenceType: 'video_generation_refund',
+        referenceId: job.id,
+        idempotencyKey: `video:refund:${job.id}`,
+      });
     }
     const updated = await this.jobs.update(job.id, { status: 'canceled', currentStage: 'canceled', completedAt: new Date() });
     logEvent('generation_canceled', { jobId: job.id, userId });
     return this.toPublic(updated ?? job);
   }
 
-  private async failAndRefund(jobId: string, workspaceId: string, credits: number, error: string): Promise<void> {
+  private async failAndRefund(jobId: string, workspaceId: string, credits: number, error: string, userId?: string): Promise<void> {
     await this.jobs.update(jobId, { status: 'failed', currentStage: 'failed', error, completedAt: new Date() });
-    if (credits > 0) await this.credits.refund(workspaceId, credits);
+    if (credits > 0) {
+      await this.credits.refund(workspaceId, credits, {
+        userId: userId ?? null,
+        description: 'Refund for failed video generation',
+        referenceType: 'video_generation_refund',
+        referenceId: jobId,
+        idempotencyKey: `video:refund:${jobId}`,
+      });
+    }
   }
 
   private async downloadToTemp(url: string): Promise<string> {
