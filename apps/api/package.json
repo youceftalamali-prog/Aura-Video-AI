@@ -12,6 +12,7 @@
     "test:security": "tsx scripts/security-deterministic-test.ts",
     "test:ai-gateway": "tsx scripts/ai-gateway-deterministic-test.ts",
     "test:library": "tsx scripts/library-deterministic-test.ts",
+    "test:billing": "tsx scripts/billing-deterministic-test.ts",
     "clean": "rm -rf dist",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
