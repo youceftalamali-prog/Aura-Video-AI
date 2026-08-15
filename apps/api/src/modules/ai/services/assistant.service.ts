@@ -45,7 +45,7 @@ export class AIAssistantService {
   "summary": short string summarizing user request
 }`;
 
-    const langInstruction = languageSystemInstruction((arguments[0] as { language?: string })?.language);
+    const langInstruction = languageSystemInstruction(input.language);
     const systemPrompt = `${langInstruction}
 You are an AI assistant for an advertising video platform (Aura Video AI).
 Detect the user's intent from their message. Focus on ad/video creation workflows.
@@ -58,21 +58,24 @@ Product ID: ${input.productId ?? 'null'}
 ${productContext}`;
 
     try {
-      return await this.ai.generateStructuredOutput<AIIntent>({
-        systemPrompt,
-        userPrompt,
-        schemaDescription,
-        parse: (raw) => {
-          const parsed = aiIntentSchema.safeParse({
-            ...(raw as object),
-            productId: (raw as unknown as AIIntent).productId ?? input.productId ?? null,
-          });
-          if (!parsed.success) {
-            throw new AppError('Invalid intent structure from AI', 502, 'AI_INTENT_INVALID');
-          }
-          return parsed.data;
+      return await this.ai.generateStructuredOutput<AIIntent>(
+        {
+          systemPrompt,
+          userPrompt,
+          schemaDescription,
+          parse: (raw) => {
+            const parsed = aiIntentSchema.safeParse({
+              ...(raw as object),
+              productId: (raw as unknown as AIIntent).productId ?? input.productId ?? null,
+            });
+            if (!parsed.success) {
+              throw new AppError('Invalid intent structure from AI', 502, 'AI_INTENT_INVALID');
+            }
+            return parsed.data;
+          },
         },
-      });
+        { strategy: input.strategy },
+      );
     } catch (err) {
       if (err instanceof AppError) throw err;
       // Fallback heuristic without claiming success of generation

@@ -39,7 +39,7 @@ export class AIController {
   ): Promise<void> => {
     try {
       const body = analyzeProductUrlBodySchema.parse(req.body);
-      const result = await this.productAnalysis.analyzeFromUrl(body.url);
+      const result = await this.productAnalysis.analyzeFromUrl(body.url, body.strategy);
       res.status(200).json({
         success: true,
         data: {
