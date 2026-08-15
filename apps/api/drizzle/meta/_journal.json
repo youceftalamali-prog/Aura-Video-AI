@@ -57,6 +57,13 @@
       "when": 1786800000000,
       "tag": "0007_production_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786803600000,
+      "tag": "0008_project_video_asset",
+      "breakpoints": true
     }
   ]
 }
