@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   ProductImportResult,
   ProductIntelligence,
@@ -55,7 +56,8 @@ export class ProductService {
 
   async importUrl(userId: string, workspaceId: string, url: string): Promise<ProductImportResult> {
     log('import_started', { source: 'url', userId });
-    await this.maybeCharge(workspaceId);
+    const operationKey = randomUUID();
+    await this.maybeCharge(workspaceId, userId, operationKey);
     try {
       const extracted = await this.urlImport.extract(url);
       const analysis = await this.analysis.analyzeFromText({
@@ -82,14 +84,15 @@ export class ProductService {
       log('import_completed', { productId: product.id, source: 'url' });
       return { product, intelligence: intel, extracted };
     } catch (err) {
-      await this.maybeRefund(workspaceId);
+      await this.maybeRefund(workspaceId, userId, operationKey);
       throw err;
     }
   }
 
   async importText(userId: string, workspaceId: string, input: ImportTextInput): Promise<ProductImportResult> {
     log('import_started', { source: 'text', userId });
-    await this.maybeCharge(workspaceId);
+    const operationKey = randomUUID();
+    await this.maybeCharge(workspaceId, userId, operationKey);
     try {
       const analysis = await this.analysis.analyzeFromText({
         name: input.name,
@@ -110,14 +113,15 @@ export class ProductService {
       });
       return { product, intelligence: intel, extracted: null };
     } catch (err) {
-      await this.maybeRefund(workspaceId);
+      await this.maybeRefund(workspaceId, userId, operationKey);
       throw err;
     }
   }
 
   async importImage(userId: string, workspaceId: string, input: ImportImageInput): Promise<ProductImportResult> {
     log('import_started', { source: 'image', userId });
-    await this.maybeCharge(workspaceId);
+    const operationKey = randomUUID();
+    await this.maybeCharge(workspaceId, userId, operationKey);
     try {
       const analysis = await this.analysis.analyzeFromImage({
         imageUrl: input.imageUrl,
@@ -140,7 +144,7 @@ export class ProductService {
       });
       return { product, intelligence: intel, extracted: null };
     } catch (err) {
-      await this.maybeRefund(workspaceId);
+      await this.maybeRefund(workspaceId, userId, operationKey);
       throw err;
     }
   }
@@ -226,19 +230,31 @@ export class ProductService {
     };
   }
 
-  private async maybeCharge(workspaceId: string): Promise<void> {
+  private async maybeCharge(workspaceId: string, userId: string, operationKey: string): Promise<void> {
     const env = getEnv();
     if (!env.PRODUCT_ANALYSIS_ENABLED_BILLING || !this.credits) return;
     const amount = env.PRODUCT_ANALYSIS_CREDITS;
     if (amount <= 0) return;
-    await this.credits.deduct(workspaceId, amount);
+    await this.credits.deduct(workspaceId, amount, {
+      userId,
+      description: 'Product analysis charge',
+      referenceType: 'product_analysis',
+      referenceId: operationKey,
+      idempotencyKey: `product:analysis:charge:${operationKey}`,
+    });
   }
 
-  private async maybeRefund(workspaceId: string): Promise<void> {
+  private async maybeRefund(workspaceId: string, userId: string, operationKey: string): Promise<void> {
     const env = getEnv();
     if (!env.PRODUCT_ANALYSIS_ENABLED_BILLING || !this.credits) return;
     const amount = env.PRODUCT_ANALYSIS_CREDITS;
     if (amount <= 0) return;
-    await this.credits.refund(workspaceId, amount);
+    await this.credits.refund(workspaceId, amount, {
+      userId,
+      description: 'Refund for failed product analysis',
+      referenceType: 'product_analysis_refund',
+      referenceId: operationKey,
+      idempotencyKey: `product:analysis:refund:${operationKey}`,
+    });
   }
 }
