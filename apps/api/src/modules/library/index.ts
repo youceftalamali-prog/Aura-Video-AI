@@ -12,6 +12,7 @@ export function createLibraryModule() {
     new ProjectRepository(db),
     new AssetRepository(db),
     new WorkspaceRepository(db),
+    db,
   );
   const controller = new LibraryController(service);
   const routes = createLibraryRoutes(controller);

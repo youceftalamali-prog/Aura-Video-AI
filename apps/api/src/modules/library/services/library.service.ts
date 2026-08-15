@@ -1,5 +1,8 @@
+import { and, eq, inArray } from 'drizzle-orm';
 import { AppError, NotFoundError } from '@aura/shared';
 import type { Asset, CreateProjectInput, Project, UpdateProjectInput } from '@aura/types';
+import type { Database } from '../../../db/client.js';
+import { products, templates } from '../../../db/schema.js';
 import type { ProjectRepository } from '../../../domain/repositories/project.repository.js';
 import type { AssetRepository } from '../../../domain/repositories/asset.repository.js';
 import type { WorkspaceRepository } from '../../../domain/repositories/workspace.repository.js';
@@ -10,6 +13,7 @@ export class LibraryService {
     private readonly projects: ProjectRepository,
     private readonly assets: AssetRepository,
     private readonly workspaces: WorkspaceRepository,
+    private readonly db: Database,
   ) {}
 
   private async workspaceId(userId: string): Promise<string> {
@@ -19,19 +23,25 @@ export class LibraryService {
   }
 
   async listProjects(userId: string): Promise<Project[]> { return this.projects.listByUser(userId); }
+
   async getProject(userId: string, id: string): Promise<Project> {
     const project = await this.projects.findByIdForUser(id, userId);
     if (!project) throw new NotFoundError('Project');
     return project;
   }
+
   async createProject(userId: string, input: Omit<CreateProjectInput, 'workspaceId'>): Promise<Project> {
-    return this.projects.create(userId, { ...input, workspaceId: await this.workspaceId(userId) });
+    const workspaceId = await this.workspaceId(userId);
+    await this.assertProjectReferences(userId, workspaceId, input);
+    return this.projects.create(userId, { ...input, workspaceId });
   }
+
   async updateProject(userId: string, id: string, input: UpdateProjectInput): Promise<Project> {
     const updated = await this.projects.update(id, userId, input);
     if (!updated) throw new NotFoundError('Project');
     return updated;
   }
+
   async deleteProject(userId: string, id: string): Promise<void> {
     const ok = await this.projects.delete(id, userId);
     if (!ok) throw new NotFoundError('Project');
@@ -70,6 +80,37 @@ export class LibraryService {
       ts: new Date().toISOString(),
     }));
     return { assetId: asset.id, url: asset.url, mimeType: asset.mimeType, name: asset.name, filename, sizeBytes: asset.sizeBytes };
+  }
+
+  private async assertProjectReferences(
+    userId: string,
+    workspaceId: string,
+    input: Omit<CreateProjectInput, 'workspaceId'>,
+  ): Promise<void> {
+    if (input.productId) {
+      const productRows = await this.db
+        .select({ id: products.id })
+        .from(products)
+        .where(and(
+          eq(products.id, input.productId),
+          eq(products.workspaceId, workspaceId),
+          eq(products.userId, userId),
+        ))
+        .limit(1);
+      if (!productRows[0]) throw new NotFoundError('Product');
+    }
+
+    if (input.templateId) {
+      const templateRows = await this.db
+        .select({ id: templates.id })
+        .from(templates)
+        .where(and(
+          eq(templates.id, input.templateId),
+          inArray(templates.status, ['published', 'active']),
+        ))
+        .limit(1);
+      if (!templateRows[0]) throw new NotFoundError('Template');
+    }
   }
 
   private async withSignedUrl(asset: Asset): Promise<Asset> {

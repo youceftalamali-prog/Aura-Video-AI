@@ -8,6 +8,7 @@ import {
   createVideoFromProductSchema,
 } from '../dto/schemas.js';
 import type { ApiResponse } from '@aura/types';
+import { NotFoundError } from '@aura/shared';
 import { WorkspaceRepository } from '../../../domain/repositories/workspace.repository.js';
 import type { Database } from '../../../db/client.js';
 
@@ -23,7 +24,7 @@ export class ProductsController {
 
   private async workspaceId(userId: string): Promise<string> {
     const ws = await this.workspaces.findPersonalByOwnerId(userId);
-    if (!ws) throw new Error('Workspace not found');
+    if (!ws) throw new NotFoundError('Workspace');
     return ws.id;
   }
 
