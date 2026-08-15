@@ -22,11 +22,11 @@ export const notificationsPatchSchema = z
   })
   .strict();
 
+/** Customer preferences intentionally do not accept a model id. */
 export const updateUserPreferencesSchema = z
   .object({
     language: languageCodeSchema.optional(),
     appearance: appearanceSchema.optional(),
-    defaultAiModel: z.string().max(200).nullable().optional(),
     aiStrategy: aiStrategySchema.optional(),
     defaultVideoDuration: z.number().int().min(5).max(120).nullable().optional(),
     defaultAspectRatio: aspectRatioSchema.nullable().optional(),
@@ -36,10 +36,10 @@ export const updateUserPreferencesSchema = z
   })
   .strict();
 
+/** Workspace members also choose a strategy, never a provider/model id. */
 export const updateWorkspaceSettingsSchema = z
   .object({
     workspaceId: z.string().uuid().optional(),
-    defaultAiModel: z.string().max(200).nullable().optional(),
     aiStrategy: aiStrategySchema.optional(),
   })
   .strict();
