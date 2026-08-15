@@ -5,7 +5,7 @@ import { creditWallets } from '../../../db/schema.js';
 import { AppError } from '@aura/shared';
 import type { VideoCostEstimate, VideoGenerationMode } from '@aura/types';
 
-type LedgerExecutor = Pick<Database, 'execute'>;
+type LedgerExecutor = Pick<Database, 'execute' | 'select'>;
 
 type LedgerTransactionRow = {
   transactionType: string;

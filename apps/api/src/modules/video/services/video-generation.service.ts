@@ -111,6 +111,15 @@ export class VideoGenerationService {
         },
       });
     } catch (err) {
+      // A concurrent retry may have created the idempotent job after the first
+      // lookup. In that case the charge is already represented by that job and
+      // must not be refunded by the losing request.
+      if (request.idempotencyKey) {
+        const existing = await this.jobs.findByIdempotency(project.workspaceId, request.idempotencyKey);
+        if (existing) {
+          return { jobId: existing.id, status: existing.status, creditsCharged: existing.creditsCharged };
+        }
+      }
       await this.credits.refund(project.workspaceId, estimate.credits, {
         userId,
         description: 'Refund for failed video job creation',
