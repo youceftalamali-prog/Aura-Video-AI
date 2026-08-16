@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
 import { AppError } from '@aura/shared';
-import { getEnv } from '@aura/config';
 import type { ApiResponse } from '@aura/types';
 
 function isZodError(err: Error): err is Error & { issues: Array<{ path: (string | number)[]; message: string }> } {

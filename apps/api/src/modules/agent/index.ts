@@ -54,7 +54,7 @@ export function createAgentModule() {
   const video = new VideoGenerationService(db, new VideoJobRepository(db), getMediaProvider());
   const billing = new BillingService(db, workspaces, new CreditRepository(db));
   const settingsRepo = new SettingsRepository(db);
-  const library = new LibraryService(new ProjectRepository(db), new AssetRepository(db), workspaces);
+  const library = new LibraryService(new ProjectRepository(db), new AssetRepository(db), workspaces, db);
 
   const conversations = new DbAgentConversationRepository(db);
   const registry = createCustomerToolRegistry({
