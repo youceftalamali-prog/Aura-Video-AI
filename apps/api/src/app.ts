@@ -1,7 +1,6 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { getEnv, APP_CONSTANTS } from '@aura/config';
 import { AppError } from '@aura/shared';
@@ -60,9 +59,12 @@ export function createApp(): Express {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
 
-  // Cookies are used only for the short-lived OAuth state on GET routes. Keeping
-  // the parser scoped avoids exposing cookie middleware to state-changing APIs.
-  app.use(`${APP_CONSTANTS.API_PREFIX}/auth/google`, cookieParser());
+  // No cookie-parsing middleware is registered in this pipeline, neither globally
+  // nor scoped to a route. Authentication is bearer-token only: there is no
+  // session cookie and no cookie-borne credential, so no state-changing handler
+  // can be driven by an ambient cookie. The only browser cookie the API uses is
+  // the short-lived Google OAuth state cookie, which is read directly from the
+  // request headers inside the GET OAuth callback handler (auth.controller.ts).
 
   app.use(
     rateLimit({

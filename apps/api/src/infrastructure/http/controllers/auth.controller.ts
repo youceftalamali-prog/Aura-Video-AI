@@ -7,6 +7,39 @@ import { GoogleOAuthService, GOOGLE_OAUTH_STATE_COOKIE } from '../../auth/google
 
 const GOOGLE_OAUTH_COOKIE_PATH = '/api/v1/auth/google';
 
+/**
+ * Reads a single named cookie from a raw `Cookie` header.
+ *
+ * The application registers no cookie-parsing middleware, so no request handler
+ * ever receives an ambient cookie jar. This helper is deliberately narrow: it is
+ * used only by the Google OAuth callback to read the short-lived OAuth state
+ * cookie. It matches the cookie name exactly, so a similarly named cookie such
+ * as `<name>_BACKUP` can never be substituted, and it never logs, returns, or
+ * otherwise exposes the value it reads.
+ *
+ * Exported only so the deterministic security tests can exercise it directly.
+ */
+export function readCookie(cookieHeader: string | undefined, cookieName: string): string | undefined {
+  if (!cookieHeader) return undefined;
+
+  for (const pair of cookieHeader.split(';')) {
+    const separatorIndex = pair.indexOf('=');
+    if (separatorIndex <= 0) continue;
+
+    const name = pair.slice(0, separatorIndex).trim();
+    if (name !== cookieName) continue;
+
+    const rawValue = pair.slice(separatorIndex + 1).trim();
+    try {
+      return decodeURIComponent(rawValue);
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -95,7 +128,9 @@ export class AuthController {
   googleCallback = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const input = googleOAuthCallbackSchema.parse(req.query);
-      const stateCookie = req.cookies?.[GOOGLE_OAUTH_STATE_COOKIE] as string | undefined;
+      // Read only the OAuth state cookie, straight from the request headers. No
+      // cookie middleware is registered, so nothing else in the pipeline sees it.
+      const stateCookie = readCookie(req.headers.cookie, GOOGLE_OAUTH_STATE_COOKIE);
       if (!this.googleOAuth.verifyState(input.state, stateCookie)) {
         this.clearGoogleCookie(res);
         res.status(400).json({ success: false, error: { code: 'AUTHENTICATION_ERROR', message: 'Invalid OAuth state' } });
