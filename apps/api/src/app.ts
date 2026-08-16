@@ -1,4 +1,4 @@
-import express, { type Express } from 'express';
+import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -29,10 +29,37 @@ function contentTypeForKey(key: string): string {
   }
 }
 
+function createCsrfOriginProtection(allowedOrigins: ReadonlySet<string>) {
+  const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
+  const oauthCallbackPath = `${APP_CONSTANTS.API_PREFIX}/auth/google/callback`;
+
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (safeMethods.has(req.method) || req.path === oauthCallbackPath) {
+      next();
+      return;
+    }
+
+    // Requests without an Origin header are non-browser clients or signed provider
+    // webhooks. Browser requests that can carry cookies must originate from an
+    // explicitly allowed frontend origin.
+    const origin = req.get('origin');
+    if (!origin || allowedOrigins.has(origin)) {
+      next();
+      return;
+    }
+
+    res.status(403).json({
+      success: false,
+      error: { code: 'CSRF_ORIGIN_REJECTED', message: 'Request origin is not allowed' },
+    });
+  };
+}
+
 export function createApp(): Express {
   const env = getEnv();
   const app = express();
   const container = createContainer();
+  const allowedOrigins = new Set(env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean));
 
   app.set('trust proxy', 1);
   app.use(requestIdMiddleware);
@@ -41,8 +68,7 @@ export function createApp(): Express {
     cors({
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
-        return callback(null, allowedOrigins.includes(origin));
+        return callback(null, allowedOrigins.has(origin));
       },
       credentials: true,
     }),
@@ -60,6 +86,7 @@ export function createApp(): Express {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
+  app.use(createCsrfOriginProtection(allowedOrigins));
 
   app.use(
     rateLimit({

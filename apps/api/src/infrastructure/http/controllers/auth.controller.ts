@@ -1,5 +1,4 @@
 import type { Response, NextFunction } from 'express';
-import { getEnv } from '@aura/config';
 import { googleOAuthCallbackSchema, registerSchema, loginSchema } from '@aura/shared';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import type { AuthService } from '../../../domain/services/auth.service.js';
@@ -112,11 +111,10 @@ export class AuthController {
   };
 
   private googleCookieOptions() {
-    const env = getEnv();
     return {
       httpOnly: true,
+      secure: true,
       sameSite: 'lax' as const,
-      secure: env.NODE_ENV === 'production',
       path: '/api/v1/auth/google',
     };
   }

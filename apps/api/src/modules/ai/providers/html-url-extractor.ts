@@ -99,12 +99,17 @@ export class HtmlUrlMetadataExtractor implements IUrlMetadataExtractor {
   }
 
   private decode(value: string): string {
+    const entities: Record<string, string> = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&apos;': "'",
+    };
+
     return value
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
+      .replace(/&(amp|lt|gt|quot|#39|apos);/g, (entity) => entities[entity] ?? entity)
       .trim();
   }
 
