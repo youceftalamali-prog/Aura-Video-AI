@@ -62,6 +62,8 @@ export class BillingService {
     const workspaceId = await this.workspaceId(userId);
     let wallet = await this.credits.findByWorkspaceId(workspaceId);
     if (!wallet) {
+      // CreditRepository.create is conflict-safe, so concurrent first visits
+      // cannot create duplicate wallets or grant an initial balance twice.
       wallet = await this.credits.create(workspaceId, 0);
     }
 
@@ -69,7 +71,7 @@ export class BillingService {
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.workspaceId, workspaceId))
-      .orderBy(desc(subscriptions.createdAt))
+      .orderBy(desc(subscriptions.updatedAt), desc(subscriptions.createdAt))
       .limit(1);
 
     const sub = subRows[0];
@@ -133,9 +135,7 @@ export class BillingService {
     return this.ledger.estimateCost(input);
   }
 
-  /**
-   * Top-up requires an external billing provider. Never invent payment success.
-   */
+  /** Top-up requires an external billing provider. Never invent payment success. */
   async requestTopUp(userId: string, amount: number): Promise<never> {
     await this.workspaceId(userId);
     if (amount <= 0 || amount > 1_000_000) {

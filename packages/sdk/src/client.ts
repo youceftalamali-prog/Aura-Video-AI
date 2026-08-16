@@ -59,6 +59,17 @@ import type {
   CreateProjectInput,
   UpdateProjectInput,
   Asset,
+  UserSettingsPayload,
+  UpdateUserPreferencesInput,
+  WorkspaceSettingsPayload,
+  UpdateWorkspaceSettingsInput,
+  AiModelOption,
+  AgentConversationRow,
+  AgentConversationDetail,
+  CreateAgentConversationInput,
+  SendAgentMessageInput,
+  AgentTurnResult,
+  RoutingStrategy,
 } from '@aura/types';
 
 export interface AuraClientOptions {
@@ -135,6 +146,10 @@ export class AuraClient {
 
   async updatePreferredLanguage(language: string): Promise<{ user: PublicUser }> {
     return this.request('PATCH', '/api/v1/auth/me/language', { language });
+  }
+
+  async listAiModels(): Promise<AiModelOption[]> {
+    return this.request<AiModelOption[]>('GET', '/api/v1/ai/models');
   }
 
   async me(): Promise<PublicUser> {
@@ -263,8 +278,11 @@ export class AuraClient {
     return this.request<{ deleted: boolean }>('DELETE', `/api/v1/products/${id}`);
   }
 
-  async importProductUrl(url: string): Promise<ProductImportResult> {
-    return this.request<ProductImportResult>('POST', '/api/v1/products/import/url', { url });
+  async importProductUrl(url: string, strategy?: RoutingStrategy): Promise<ProductImportResult> {
+    return this.request<ProductImportResult>('POST', '/api/v1/products/import/url', {
+      url,
+      ...(strategy ? { strategy } : {}),
+    });
   }
 
   async importProductText(input: ImportTextInput): Promise<ProductImportResult> {
@@ -279,8 +297,16 @@ export class AuraClient {
     return this.request<ProductIntelligence>('GET', `/api/v1/products/${id}/intelligence`);
   }
 
-  async generateProductHooks(id: string): Promise<GeneratedHook[]> {
-    return this.request<GeneratedHook[]>('POST', `/api/v1/products/${id}/hooks`);
+  async refreshProductIntelligence(id: string, strategy?: RoutingStrategy): Promise<ProductIntelligence> {
+    return this.request<ProductIntelligence>('POST', `/api/v1/products/${id}/intelligence/refresh`, {
+      ...(strategy ? { strategy } : {}),
+    });
+  }
+
+  async generateProductHooks(id: string, strategy?: RoutingStrategy): Promise<GeneratedHook[]> {
+    return this.request<GeneratedHook[]>('POST', `/api/v1/products/${id}/hooks`, {
+      ...(strategy ? { strategy } : {}),
+    });
   }
 
   async createVideoFromProduct(id: string, input?: Omit<CreateVideoFromProductInput, 'productId'>): Promise<CreateVideoFromProductResult> {
@@ -473,5 +499,38 @@ export class AuraClient {
 
   async cancelSubscription(): Promise<{ status: string; cancelAtPeriodEnd: boolean }> {
     return this.request('POST', '/api/v1/billing/subscription/cancel');
+  }
+
+  async getUserSettings(): Promise<UserSettingsPayload> {
+    return this.request<UserSettingsPayload>('GET', '/api/v1/settings/user');
+  }
+
+  async updateUserSettings(input: UpdateUserPreferencesInput): Promise<UserSettingsPayload> {
+    return this.request<UserSettingsPayload>('PATCH', '/api/v1/settings/user', input);
+  }
+
+  async getSettingsWorkspace(workspaceId?: string): Promise<WorkspaceSettingsPayload> {
+    const qs = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+    return this.request<WorkspaceSettingsPayload>('GET', `/api/v1/settings/workspace${qs}`);
+  }
+
+  async updateSettingsWorkspace(input: UpdateWorkspaceSettingsInput & { workspaceId?: string }): Promise<WorkspaceSettingsPayload> {
+    return this.request<WorkspaceSettingsPayload>('PATCH', '/api/v1/settings/workspace', input);
+  }
+
+  async createAgentConversation(input?: CreateAgentConversationInput): Promise<AgentConversationRow> {
+    return this.request<AgentConversationRow>('POST', '/api/v1/agent/conversations', input ?? {});
+  }
+
+  async getAgentConversation(id: string): Promise<AgentConversationDetail> {
+    return this.request<AgentConversationDetail>('GET', `/api/v1/agent/conversations/${id}`);
+  }
+
+  async sendAgentMessage(id: string, input: SendAgentMessageInput): Promise<AgentTurnResult> {
+    return this.request<AgentTurnResult>('POST', `/api/v1/agent/conversations/${id}/messages`, input);
+  }
+
+  async cancelAgentConversation(id: string): Promise<AgentConversationRow> {
+    return this.request<AgentConversationRow>('POST', `/api/v1/agent/conversations/${id}/cancel`);
   }
 }

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner } from '@aura/ui';
+import { api } from '../lib/api';
 import { downloadAssetById, downloadFromUrl, type DownloadState } from '../lib/download';
 
 export interface VideoResultCardProps {
@@ -28,20 +29,50 @@ export function VideoResultCard({
   createdAt,
 }: VideoResultCardProps) {
   const { t } = useTranslation();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(videoUrl);
+  const [previewLoading, setPreviewLoading] = useState(Boolean(assetId));
   const [dl, setDl] = useState<DownloadState>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  const ready = Boolean(videoUrl) && (status === 'completed' || status === 'ready');
+  useEffect(() => {
+    let mounted = true;
+    setPreviewUrl(videoUrl);
+    setError(null);
+
+    if (!assetId) {
+      setPreviewLoading(false);
+      return () => { mounted = false; };
+    }
+
+    setPreviewLoading(true);
+    // Resolve a fresh signed URL for preview. The job's persisted output URL
+    // may have expired; export/download always uses the asset id as well.
+    api.getAsset(assetId)
+      .then((asset) => {
+        if (mounted) setPreviewUrl(asset.url || videoUrl || null);
+      })
+      .catch((err) => {
+        if (mounted) setError(err instanceof Error ? err.message : 'ASSET_PREVIEW_UNAVAILABLE');
+      })
+      .finally(() => {
+        if (mounted) setPreviewLoading(false);
+      });
+
+    return () => { mounted = false; };
+  }, [assetId, videoUrl]);
+
+  const terminal = status === 'completed' || status === 'ready';
+  const deliverable = terminal && Boolean(assetId || previewUrl);
+  const ready = terminal && Boolean(previewUrl);
 
   async function onDownload() {
     setError(null);
     setDl('preparing');
     try {
-      setDl('downloading');
       if (assetId) {
         await downloadAssetById(assetId);
-      } else if (videoUrl) {
-        await downloadFromUrl(videoUrl, 'aura-video.mp4');
+      } else if (previewUrl) {
+        await downloadFromUrl(previewUrl, 'aura-video.mp4');
       } else {
         throw new Error('ASSET_NOT_READY');
       }
@@ -55,23 +86,31 @@ export function VideoResultCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{ready ? (title || t('video.ready')) : t('video.processing')}</CardTitle>
+        <CardTitle>{deliverable ? (title || t('video.ready')) : t('video.processing')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <Alert variant="error">{error}</Alert>}
 
-        {!ready && (
+        {previewLoading && (
           <div className="flex items-center gap-3 text-sm text-slate-600">
             <Spinner size="sm" />
             <span>{t('video.preparing')}</span>
           </div>
         )}
 
-        {ready && videoUrl && (
+        {!previewLoading && !ready && (
+          <div className="flex items-center gap-3 text-sm text-slate-600">
+            <Spinner size="sm" />
+            <span>{t('video.preparing')}</span>
+          </div>
+        )}
+
+        {ready && previewUrl && (
           <video
-            src={videoUrl}
+            src={previewUrl}
             controls
             playsInline
+            preload="metadata"
             className="max-h-[28rem] w-full rounded-xl bg-black"
           />
         )}
@@ -94,7 +133,7 @@ export function VideoResultCard({
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button
             className="w-full sm:w-auto"
-            disabled={!ready || dl === 'downloading' || dl === 'preparing'}
+            disabled={!deliverable || dl === 'downloading' || dl === 'preparing'}
             loading={dl === 'downloading' || dl === 'preparing'}
             onClick={onDownload}
           >

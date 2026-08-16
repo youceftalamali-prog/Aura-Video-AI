@@ -45,19 +45,21 @@ export interface AnalyzeProductTextInput {
   name: string;
   description: string;
   metadata?: Record<string, unknown>;
-
   language?: string;
   contentLanguage?: string;
   videoLanguage?: string;
-  aiOutputLanguage?: string;}
+  aiOutputLanguage?: string;
+  strategy?: RoutingStrategy;
+}
 
 export interface AnalyzeProductUrlInput {
   url: string;
-
   language?: string;
   contentLanguage?: string;
   videoLanguage?: string;
-  aiOutputLanguage?: string;}
+  aiOutputLanguage?: string;
+  strategy?: RoutingStrategy;
+}
 
 export interface AnalyzeProductImageInput {
   imageUrl?: string;
@@ -65,11 +67,12 @@ export interface AnalyzeProductImageInput {
   mimeType?: string;
   name?: string;
   description?: string;
-
   language?: string;
   contentLanguage?: string;
   videoLanguage?: string;
-  aiOutputLanguage?: string;}
+  aiOutputLanguage?: string;
+  strategy?: RoutingStrategy;
+}
 
 export interface AIAssistantInput {
   message: string;
@@ -79,6 +82,7 @@ export interface AIAssistantInput {
   contentLanguage?: string;
   videoLanguage?: string;
   aiOutputLanguage?: string;
+  strategy?: RoutingStrategy;
 }
 
 export interface AIIntent {
@@ -98,4 +102,43 @@ export interface AIAssistantResponse {
   product: ProductAnalysis | null;
   recommendedNextStep: string;
   message: string;
+}
+
+// ===== AI Gateway (Phase A) =====
+
+/** Routing strategy used by the AI gateway to select a provider/model. */
+export type RoutingStrategy = 'fast' | 'balanced' | 'smart';
+
+/** Abstract AI capability a provider must support. */
+export type AICapability =
+  | 'analyze-text'
+  | 'analyze-image'
+  | 'analyze-product'
+  | 'generate-structured';
+
+/** Describes a model available through the AI gateway. */
+export interface ModelDescriptor {
+  id: string;
+  provider: string;
+  capabilities: AICapability[];
+  aliases?: string[];
+  /** Human-readable model name (catalog-provided); falls back to id. */
+  displayName?: string;
+  contextWindow?: number;
+  maxOutputTokens?: number;
+  supportsVision?: boolean;
+  /** Input modalities advertised by the model (e.g. ['text', 'image']). */
+  inputModalities?: string[];
+  /** Output modalities advertised by the model (e.g. ['text']). */
+  outputModalities?: string[];
+  /** USD per 1M prompt tokens (0 when unknown). */
+  promptPrice?: number;
+  /** USD per 1M completion tokens (0 when unknown). */
+  completionPrice?: number;
+  /** Whether the model advertises structured-output / response_format support. */
+  supportsStructuredOutputs?: boolean;
+  /** Where the descriptor came from: environment config or a provider catalog. */
+  source?: 'env' | 'catalog';
+  /** Whether this model is the configured default for its provider. */
+  isDefault?: boolean;
 }

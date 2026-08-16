@@ -1,5 +1,5 @@
 import type { UUID, ISODateString } from './common';
-import type { ProductAnalysis } from './ai';
+import type { ProductAnalysis, RoutingStrategy } from './ai';
 import type { CreativeStrategy, AdScript, Storyboard, TemplateRecommendation } from './creative';
 
 export type ProductImportSource = 'url' | 'image' | 'text' | 'existing';
@@ -114,6 +114,7 @@ export interface ProductRecord {
 export interface ImportUrlInput {
   url: string;
   workspaceId?: UUID;
+  strategy?: RoutingStrategy;
 }
 
 export interface ImportTextInput {
@@ -122,6 +123,7 @@ export interface ImportTextInput {
   price?: string;
   currency?: string;
   brand?: string;
+  strategy?: RoutingStrategy;
 }
 
 export interface ImportImageInput {
@@ -130,6 +132,7 @@ export interface ImportImageInput {
   mimeType?: string;
   name?: string;
   description?: string;
+  strategy?: RoutingStrategy;
 }
 
 export interface ProductImportResult {

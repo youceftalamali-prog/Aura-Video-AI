@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, ne } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { assets } from '../../db/schema.js';
 import type { Asset } from '@aura/types';
@@ -21,7 +21,7 @@ export class AssetRepository {
   }
 
   async listByUser(userId: string, type?: string, limit = 50): Promise<Asset[]> {
-    const conditions = [eq(assets.userId, userId)];
+    const conditions = [eq(assets.userId, userId), ne(assets.status, 'deleted')];
     if (type) conditions.push(eq(assets.type, type));
     const rows = await this.db
       .select()
@@ -33,7 +33,7 @@ export class AssetRepository {
   }
 
   async listByWorkspace(workspaceId: string, type?: string, limit = 50): Promise<Asset[]> {
-    const conditions = [eq(assets.workspaceId, workspaceId)];
+    const conditions = [eq(assets.workspaceId, workspaceId), ne(assets.status, 'deleted')];
     if (type) conditions.push(eq(assets.type, type));
     const rows = await this.db
       .select()

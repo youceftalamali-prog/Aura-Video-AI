@@ -53,8 +53,9 @@ export class BillingController {
   topUp = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const body = topUpBodySchema.parse(req.body);
-      const pkg = body.amount >= 1500 ? 'large' : body.amount >= 400 ? 'medium' : 'small';
-      const data = await this.paypalBilling.createCreditCheckout(req.user!.sub, pkg as 'small' | 'medium' | 'large');
+      const amount = body.amount ?? 0;
+      const pkg = body.package ?? (amount >= 1500 ? 'large' : amount >= 400 ? 'medium' : 'small');
+      const data = await this.paypalBilling.createCreditCheckout(req.user!.sub, pkg);
       res.json({ success: true, data } satisfies ApiResponse);
     } catch (e) { next(e); }
   };

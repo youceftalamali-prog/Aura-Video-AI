@@ -11,6 +11,11 @@ import { AuthController } from './infrastructure/http/controllers/auth.controlle
 import { DashboardController } from './infrastructure/http/controllers/dashboard.controller.js';
 import { AdminController } from './infrastructure/http/controllers/admin.controller.js';
 import { HealthController } from './infrastructure/http/controllers/health.controller.js';
+import { GoogleOAuthService } from './infrastructure/auth/google-oauth.service.js';
+import { createAIGateway, ProviderConfigService } from './modules/ai/gateway/index.js';
+import { DbProviderConfigRepository } from './modules/ai/repositories/provider-config.repository.js';
+import { DbModelAllowlistRepository } from './modules/ai/repositories/model-allowlist.repository.js';
+import { TokenCryptoService } from './modules/publishing/services/token-crypto.service.js';
 
 export function createContainer() {
   const db = getDb();
@@ -24,10 +29,20 @@ export function createContainer() {
 
   const authService = new AuthService(userRepo, sessionRepo, workspaceRepo, creditRepo);
   const dashboardService = new DashboardService(userRepo, workspaceRepo, projectRepo, creditRepo);
+  const googleOAuthService = new GoogleOAuthService();
 
-  const authController = new AuthController(authService);
+  const providerConfigService = new ProviderConfigService(
+    new DbProviderConfigRepository(db),
+    new TokenCryptoService(),
+  );
+  const aiGateway = createAIGateway({
+    configService: providerConfigService,
+    allowlistRepo: new DbModelAllowlistRepository(db),
+  });
+
+  const authController = new AuthController(authService, googleOAuthService);
   const dashboardController = new DashboardController(dashboardService);
-  const adminController = new AdminController(userRepo, settingsRepo);
+  const adminController = new AdminController(userRepo, settingsRepo, providerConfigService, aiGateway);
   const healthController = new HealthController();
 
   return {
@@ -37,6 +52,8 @@ export function createContainer() {
     healthController,
     userRepo,
     settingsRepo,
+    providerConfigService,
+    aiGateway,
   };
 }
 

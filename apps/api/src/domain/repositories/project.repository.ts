@@ -76,11 +76,16 @@ export class ProjectRepository {
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.name !== undefined) patch.name = input.name;
     if (input.description !== undefined) patch.description = input.description;
-    if (input.status !== undefined) patch.status = input.status;
+    if (input.status !== undefined) {
+      patch.status = input.status;
+      if (input.status === 'completed') patch.completedAt = new Date();
+      if (input.status === 'draft') patch.completedAt = null;
+    }
     if (input.thumbnailUrl !== undefined) patch.thumbnailUrl = input.thumbnailUrl;
     if (input.videoUrl !== undefined) patch.videoUrl = input.videoUrl;
     if (input.durationSeconds !== undefined) patch.durationSeconds = input.durationSeconds;
     if (input.resolution !== undefined) patch.resolution = input.resolution;
+    if (input.creditsUsed !== undefined) patch.creditsUsed = input.creditsUsed;
     const rows = await this.db
       .update(projects)
       .set(patch)

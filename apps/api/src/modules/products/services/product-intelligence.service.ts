@@ -1,9 +1,10 @@
 import type {
   ProductAnalysis,
   ProductIntelligence,
-    ExtractedProductData,
+  ExtractedProductData,
   GeneratedHook,
-  } from '@aura/types';
+  RoutingStrategy,
+} from '@aura/types';
 import type { IAIProvider } from '../../ai/interfaces/ai-provider.interface.js';
 import { AppError } from '@aura/shared';
 import { z } from 'zod';
@@ -76,7 +77,11 @@ const hooksSchema = z.array(
 export class ProductIntelligenceService {
   constructor(private readonly ai: IAIProvider) {}
 
-  async build(analysis: ProductAnalysis, extracted?: ExtractedProductData | null): Promise<ProductIntelligence> {
+  async build(
+    analysis: ProductAnalysis,
+    extracted?: ExtractedProductData | null,
+    strategy?: RoutingStrategy,
+  ): Promise<ProductIntelligence> {
     const systemPrompt = `You are a product marketing analyst.
 Separate verified facts from inferred marketing suggestions.
 Never invent product claims that are not supported by the input.
@@ -101,20 +106,23 @@ ${JSON.stringify(extracted?.rawFacts ?? {}, null, 2)}
 Build ProductIntelligence. Label only supported facts in productProfile.facts.`;
 
     try {
-      const partial = await this.ai.generateStructuredOutput<z.infer<typeof intelligenceSchema>>({
-        systemPrompt,
-        userPrompt,
-        schemaDescription,
-        parse: (raw) => {
-          const parsed = intelligenceSchema.safeParse(raw);
-          if (!parsed.success) {
-            throw new AppError('Intelligence schema validation failed', 502, 'AI_SCHEMA_VALIDATION', {
-              issues: parsed.error.flatten(),
-            });
-          }
-          return parsed.data;
+      const partial = await this.ai.generateStructuredOutput<z.infer<typeof intelligenceSchema>>(
+        {
+          systemPrompt,
+          userPrompt,
+          schemaDescription,
+          parse: (raw) => {
+            const parsed = intelligenceSchema.safeParse(raw);
+            if (!parsed.success) {
+              throw new AppError('Intelligence schema validation failed', 502, 'AI_SCHEMA_VALIDATION', {
+                issues: parsed.error.flatten(),
+              });
+            }
+            return parsed.data;
+          },
         },
-      });
+        { strategy },
+      );
 
       return {
         ...partial,
@@ -127,7 +135,11 @@ Build ProductIntelligence. Label only supported facts in productProfile.facts.`;
     }
   }
 
-  async generateHooks(analysis: ProductAnalysis, intelligence: ProductIntelligence): Promise<GeneratedHook[]> {
+  async generateHooks(
+    analysis: ProductAnalysis,
+    intelligence: ProductIntelligence,
+    strategy?: RoutingStrategy,
+  ): Promise<GeneratedHook[]> {
     const systemPrompt = `Generate short advertising hooks for product ads.
 No deceptive medical/financial claims. JSON array only.`;
     const schemaDescription = `[{ style, text, score }]`;
@@ -137,18 +149,21 @@ Angles: ${intelligence.marketingAngles.map((a) => a.type).join(', ')}
 Generate 8 diverse hooks.`;
 
     try {
-      return await this.ai.generateStructuredOutput<GeneratedHook[]>({
-        systemPrompt,
-        userPrompt,
-        schemaDescription,
-        parse: (raw) => {
-          const parsed = hooksSchema.safeParse(raw);
-          if (!parsed.success) {
-            throw new AppError('Hooks schema validation failed', 502, 'AI_SCHEMA_VALIDATION');
-          }
-          return parsed.data;
+      return await this.ai.generateStructuredOutput<GeneratedHook[]>(
+        {
+          systemPrompt,
+          userPrompt,
+          schemaDescription,
+          parse: (raw) => {
+            const parsed = hooksSchema.safeParse(raw);
+            if (!parsed.success) {
+              throw new AppError('Hooks schema validation failed', 502, 'AI_SCHEMA_VALIDATION');
+            }
+            return parsed.data;
+          },
         },
-      });
+        { strategy },
+      );
     } catch (err) {
       if (err instanceof AppError) throw err;
       throw new AppError(`Hook generation failed: ${(err as unknown as Error).message}`, 502, 'AI_PROVIDER_ERROR');

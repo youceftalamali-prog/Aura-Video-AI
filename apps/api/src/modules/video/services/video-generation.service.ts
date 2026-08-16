@@ -1,4 +1,5 @@
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { getEnv } from '@aura/config';
 import { AppError, NotFoundError, AuthorizationError } from '@aura/shared';
@@ -24,6 +25,7 @@ function logEvent(event: string, payload: Record<string, unknown>): void {
 }
 
 const ACTIVE: VideoJobStatus[] = ['queued', 'processing', 'composing', 'rendering'];
+const DEFAULT_LEASE_OWNER = `inline:${process.pid}`;
 
 export class VideoGenerationService {
   private readonly credits: CreditLedgerService;
@@ -76,7 +78,15 @@ export class VideoGenerationService {
     }
 
     const estimate = this.credits.estimateCost({ duration: request.duration, sceneCount: request.scenes.length, mode });
-    await this.credits.deduct(project.workspaceId, estimate.credits);
+    const chargeReference = request.idempotencyKey ? `request:${request.idempotencyKey}` : randomUUID();
+    const chargeIdempotencyKey = `video:charge:${project.workspaceId}:${chargeReference}`;
+    await this.credits.deduct(project.workspaceId, estimate.credits, {
+      userId,
+      description: 'Video generation charge',
+      referenceType: 'video_generation',
+      referenceId: chargeReference,
+      idempotencyKey: chargeIdempotencyKey,
+    });
 
     const prompt = request.scenes.map((s) => s.visualPrompt).join('\n---\n');
     let job;
@@ -102,13 +112,24 @@ export class VideoGenerationService {
         },
       });
     } catch (err) {
-      await this.credits.refund(project.workspaceId, estimate.credits);
+      if (request.idempotencyKey) {
+        const existing = await this.jobs.findByIdempotency(project.workspaceId, request.idempotencyKey);
+        if (existing) {
+          return { jobId: existing.id, status: existing.status, creditsCharged: existing.creditsCharged };
+        }
+      }
+      await this.credits.refund(project.workspaceId, estimate.credits, {
+        userId,
+        description: 'Refund for failed video job creation',
+        referenceType: 'video_generation_refund',
+        referenceId: chargeReference,
+        idempotencyKey: `video:refund:create:${chargeReference}`,
+      });
       throw err;
     }
 
     logEvent('generation_requested', { jobId: job.id, projectId: project.id, userId, mode, credits: estimate.credits });
 
-    // Non-blocking background processing
     setImmediate(() => {
       this.processJob(job.id).catch((err) => {
         console.error(JSON.stringify({ level: 'error', event: 'background_process_failed', jobId: job.id, error: (err as unknown as Error).message }));
@@ -119,18 +140,15 @@ export class VideoGenerationService {
       const redis = getRedis();
       await redis.lpush('aura:video:jobs', job.id);
     } catch {
-      // Redis optional for queue fan-out; in-process still runs
+      // Redis optional for queue fan-out; the database worker can recover queued jobs
     }
 
     return { jobId: job.id, status: 'queued', creditsCharged: estimate.credits };
   }
 
-  async processJob(jobId: string): Promise<void> {
-    const job = await this.jobs.findById(jobId);
+  async processJob(jobId: string, leaseOwner = DEFAULT_LEASE_OWNER): Promise<void> {
+    const job = await this.jobs.claimQueued(jobId, leaseOwner);
     if (!job) return;
-    if (!ACTIVE.includes(job.status) && job.status !== 'queued') {
-      return;
-    }
 
     const input = job.input as {
       aspectRatio: VideoGenerationRequest['aspectRatio'];
@@ -142,8 +160,6 @@ export class VideoGenerationService {
     };
 
     try {
-      await this.jobs.update(jobId, { status: 'processing', currentStage: 'provider_submit', progress: 5 });
-
       const prompt = job.prompt || input.scenes.map((s) => s.visualPrompt).join('\n');
       const submitted = await this.media.generateVideo({
         prompt,
@@ -162,13 +178,17 @@ export class VideoGenerationService {
         currentStage: 'provider_processing',
         progress: 15,
       });
-      logEvent('generation_submitted', { jobId, providerJobId: submitted.providerJobId });
+      logEvent('generation_submitted', { jobId, providerJobId: submitted.providerJobId, leaseOwner });
 
-      // Poll provider until terminal or timeout
       const maxAttempts = 60;
       let remoteUrl: string | null = null;
       for (let i = 0; i < maxAttempts; i++) {
         await sleep(5000);
+        if (!(await this.jobs.heartbeat(jobId, leaseOwner))) {
+          logEvent('generation_lease_lost', { jobId, leaseOwner });
+          return;
+        }
+
         const current = await this.jobs.findById(jobId);
         if (!current || current.status === 'canceled') return;
 
@@ -182,12 +202,18 @@ export class VideoGenerationService {
         });
 
         if (remote.status === 'failed') {
-          await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, remote.error || 'Provider failed');
+          await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, remote.error || 'Provider failed', job.userId);
           return;
         }
         if (remote.status === 'canceled') {
           await this.jobs.update(jobId, { status: 'canceled', completedAt: new Date() });
-          await this.credits.refund(job.workspaceId, job.creditsCharged);
+          await this.credits.refund(job.workspaceId, job.creditsCharged, {
+            userId: job.userId,
+            description: 'Refund for canceled video generation',
+            referenceType: 'video_generation_refund',
+            referenceId: jobId,
+            idempotencyKey: `video:refund:${jobId}`,
+          });
           return;
         }
         if (remote.status === 'completed' && remote.outputUrl) {
@@ -197,11 +223,14 @@ export class VideoGenerationService {
       }
 
       if (!remoteUrl) {
-        await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, 'Video generation timed out');
+        await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, 'Video generation timed out', job.userId);
         throw new AppError('Video generation timed out', 504, 'VIDEO_GENERATION_TIMEOUT');
       }
 
-      // Compose + store
+      if (!(await this.jobs.heartbeat(jobId, leaseOwner))) {
+        logEvent('generation_lease_lost_before_composition', { jobId, leaseOwner });
+        return;
+      }
       await this.jobs.update(jobId, { status: 'composing', currentStage: 'composing', progress: 75 });
       logEvent('generation_processing', { jobId, stage: 'composing' });
 
@@ -219,8 +248,10 @@ export class VideoGenerationService {
         })),
       });
 
-      const assetId = await this.persistLocalVideo(job, composed.localPath);
-      const storageUrl = (await this.jobs.findById(jobId))?.outputUrl;
+      const assetId = await this.persistLocalVideo(job, composed.localPath, {
+        durationSeconds: input.duration,
+        resolution: input.aspectRatio,
+      });
 
       await this.jobs.update(jobId, {
         status: 'completed',
@@ -230,14 +261,13 @@ export class VideoGenerationService {
         completedAt: new Date(),
       });
 
-      // cleanup temps
       await fs.unlink(localProviderPath).catch(() => undefined);
       await fs.unlink(composed.localPath).catch(() => undefined);
 
-      logEvent('generation_completed', { jobId, assetId, outputUrl: storageUrl });
+      logEvent('generation_completed', { jobId, assetId, leaseOwner });
     } catch (err) {
       const message = err instanceof AppError ? err.message : (err as unknown as Error).message;
-      await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, message);
+      await this.failAndRefund(jobId, job.workspaceId, job.creditsCharged, message, job.userId);
       logEvent('generation_failed', { jobId, error: message });
     }
   }
@@ -245,6 +275,27 @@ export class VideoGenerationService {
   async getJob(userId: string, jobId: string): Promise<VideoGenerationJobPublic> {
     const job = await this.jobs.findByIdForUser(jobId, userId);
     if (!job) throw new AppError('Video job not found', 404, 'VIDEO_JOB_NOT_FOUND');
+
+    // Never return an expired URL when an asset is available. Resolve a fresh
+    // server-signed URL, while keeping ownership scoped to the requesting user.
+    if (job.assetId) {
+      const rows = await this.db
+        .select({ storageKey: assets.storageKey, status: assets.status })
+        .from(assets)
+        .where(and(eq(assets.id, job.assetId), eq(assets.userId, userId)))
+        .limit(1);
+      const asset = rows[0];
+      if (asset?.status === 'ready') {
+        const storage = getStorageProvider();
+        if (await storage.exists(asset.storageKey)) {
+          job.outputUrl = await storage.getSignedUrl(asset.storageKey, 3600);
+        } else {
+          job.outputUrl = null;
+        }
+      } else {
+        job.outputUrl = null;
+      }
+    }
     return this.toPublic(job);
   }
 
@@ -258,16 +309,30 @@ export class VideoGenerationService {
       await this.media.cancelJob(job.providerJobId);
     }
     if (job.creditsCharged > 0 && ACTIVE.includes(job.status)) {
-      await this.credits.refund(job.workspaceId, job.creditsCharged);
+      await this.credits.refund(job.workspaceId, job.creditsCharged, {
+        userId,
+        description: 'Refund for canceled video generation',
+        referenceType: 'video_generation_refund',
+        referenceId: job.id,
+        idempotencyKey: `video:refund:${job.id}`,
+      });
     }
     const updated = await this.jobs.update(job.id, { status: 'canceled', currentStage: 'canceled', completedAt: new Date() });
     logEvent('generation_canceled', { jobId: job.id, userId });
     return this.toPublic(updated ?? job);
   }
 
-  private async failAndRefund(jobId: string, workspaceId: string, credits: number, error: string): Promise<void> {
+  private async failAndRefund(jobId: string, workspaceId: string, credits: number, error: string, userId?: string): Promise<void> {
     await this.jobs.update(jobId, { status: 'failed', currentStage: 'failed', error, completedAt: new Date() });
-    if (credits > 0) await this.credits.refund(workspaceId, credits);
+    if (credits > 0) {
+      await this.credits.refund(workspaceId, credits, {
+        userId: userId ?? null,
+        description: 'Refund for failed video generation',
+        referenceType: 'video_generation_refund',
+        referenceId: jobId,
+        idempotencyKey: `video:refund:${jobId}`,
+      });
+    }
   }
 
   private async downloadToTemp(url: string): Promise<string> {
@@ -283,7 +348,8 @@ export class VideoGenerationService {
   private async persistLocalVideo(
     job: { id: string; workspaceId: string; userId: string; projectId: string },
     localPath: string,
-  ): Promise<string | null> {
+    metadata: { durationSeconds?: number; resolution?: string },
+  ): Promise<string> {
     try {
       const storage = getStorageProvider();
       const key = `videos/${job.workspaceId}/${job.id}.mp4`;
@@ -309,9 +375,28 @@ export class VideoGenerationService {
           metadata: { jobId: job.id, projectId: job.projectId, source: 'video_generation' },
         })
         .returning();
-      await this.jobs.update(job.id, { outputUrl: uploaded.url, assetId: rows[0]?.id ?? null });
-      return rows[0]?.id ?? null;
+      const asset = rows[0];
+      if (!asset) throw new AppError('Video asset could not be persisted', 500, 'VIDEO_STORAGE_FAILED');
+
+      const projectRows = await this.db
+        .update(projects)
+        .set({
+          videoAssetId: asset.id,
+          videoUrl: null,
+          status: 'completed',
+          durationSeconds: metadata.durationSeconds ?? null,
+          resolution: metadata.resolution ?? null,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(projects.id, job.projectId), eq(projects.workspaceId, job.workspaceId)))
+        .returning({ id: projects.id });
+      if (!projectRows[0]) throw new AppError('Project video link could not be persisted', 500, 'VIDEO_PROJECT_LINK_FAILED');
+
+      await this.jobs.update(job.id, { outputUrl: null, assetId: asset.id });
+      return asset.id;
     } catch (err) {
+      if (err instanceof AppError) throw err;
       throw new AppError(`Video storage failed: ${(err as unknown as Error).message}`, 500, 'VIDEO_STORAGE_FAILED');
     }
   }

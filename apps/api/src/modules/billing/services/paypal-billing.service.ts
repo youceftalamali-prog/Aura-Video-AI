@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import type { Database } from '../../../db/client.js';
 import { subscriptions } from '../../../db/schema.js';
 import { AppError } from '@aura/shared';
@@ -72,13 +72,19 @@ export class PayPalBillingService {
   }
 
   listCreditPackages() {
-    return (Object.keys(CREDIT_PACKAGES) as unknown as CreditPackageKey[]).map((key) => ({
-      key,
-      ...CREDIT_PACKAGES[key],
-      priceConfigured: isPayPalConfigured(),
-      value: creditPackageValue(key).value,
-      currency: creditPackageValue(key).currency,
-    }));
+    return (Object.keys(CREDIT_PACKAGES) as unknown as CreditPackageKey[]).map((key) => {
+      // Pricing is optional for the visibility page. Default sample prices do
+      // not count as checkout configuration until PayPal credentials exist.
+      if (!isPayPalConfigured()) {
+        return { key, ...CREDIT_PACKAGES[key], priceConfigured: false, value: null, currency: null };
+      }
+      try {
+        const pricing = creditPackageValue(key);
+        return { key, ...CREDIT_PACKAGES[key], priceConfigured: true, value: pricing.value, currency: pricing.currency };
+      } catch {
+        return { key, ...CREDIT_PACKAGES[key], priceConfigured: false, value: null, currency: null };
+      }
+    });
   }
 
   getClientId(): string | null {
@@ -93,12 +99,11 @@ export class PayPalBillingService {
     }
     const planId = paypalPlanId(plan);
     const ws = await this.getWorkspaceForUser(userId);
-
-    // Prevent duplicate ACTIVE subscriptions for the same workspace
     const existing = await this.db
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.workspaceId, ws.id))
+      .orderBy(desc(subscriptions.updatedAt), desc(subscriptions.createdAt))
       .limit(1);
     if (existing[0] && existing[0].status === 'active' && existing[0].externalId) {
       throw new AppError(
@@ -120,11 +125,7 @@ export class PayPalBillingService {
           cancel_url: env.PAYPAL_CANCEL_URL,
         },
       });
-      return {
-        checkoutUrl: approveUrl(sub.links),
-        sessionId: sub.id,
-        provider: 'paypal' as const,
-      };
+      return { checkoutUrl: approveUrl(sub.links), sessionId: sub.id, provider: 'paypal' as const };
     } catch (err) {
       if (err instanceof AppError) throw err;
       throw new AppError(`PayPal subscription failed: ${(err as unknown as Error).message}`, 502, 'PAYPAL_CHECKOUT_FAILED');
@@ -142,16 +143,11 @@ export class PayPalBillingService {
     try {
       const order = await paypalRequest<PayPalOrder>('POST', '/v2/checkout/orders', {
         intent: 'CAPTURE',
-        purchase_units: [
-          {
-            amount: {
-              currency_code: currency,
-              value,
-            },
-            description: `Aura Video AI credits pack: ${pkg} (${credits} credits)`,
-            custom_id: `${ws.id}|${userId}|credits|${pkg}|${credits}`,
-          },
-        ],
+        purchase_units: [{
+          amount: { currency_code: currency, value },
+          description: `Aura Video AI credits pack: ${pkg} (${credits} credits)`,
+          custom_id: `${ws.id}|${userId}|credits|${pkg}|${credits}`,
+        }],
         application_context: {
           brand_name: 'Aura Video AI',
           user_action: 'PAY_NOW',
@@ -159,21 +155,13 @@ export class PayPalBillingService {
           cancel_url: env.PAYPAL_CANCEL_URL,
         },
       });
-      return {
-        checkoutUrl: approveUrl(order.links),
-        sessionId: order.id,
-        provider: 'paypal' as const,
-      };
+      return { checkoutUrl: approveUrl(order.links), sessionId: order.id, provider: 'paypal' as const };
     } catch (err) {
       if (err instanceof AppError) throw err;
       throw new AppError(`PayPal order failed: ${(err as unknown as Error).message}`, 502, 'PAYPAL_CHECKOUT_FAILED');
     }
   }
 
-  /**
-   * Capture a PayPal order after buyer approval (also done via webhook).
-   * Does NOT grant credits — webhook fulfillment is authoritative for grants.
-   */
   async captureOrder(orderId: string): Promise<{ status: string; orderId: string }> {
     requirePayPalConfig();
     const result = await paypalRequest<PayPalOrder>('POST', `/v2/checkout/orders/${orderId}/capture`, {});
@@ -187,28 +175,22 @@ export class PayPalBillingService {
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.workspaceId, ws.id))
+      .orderBy(desc(subscriptions.updatedAt), desc(subscriptions.createdAt))
       .limit(1);
     const sub = subRows[0];
-    if (!sub?.externalId) {
+    if (!sub?.externalId || !['active', 'created', 'approved', 'pending'].includes(sub.status)) {
       throw new AppError('No active PayPal subscription', 404, 'BILLING_CUSTOMER_NOT_FOUND');
     }
     await paypalRequest('POST', `/v1/billing/subscriptions/${sub.externalId}/cancel`, {
       reason: 'User requested cancellation',
     });
-    // PayPal cancel ends the subscription on PayPal side immediately.
     await this.db
       .update(subscriptions)
-      .set({
-        cancelAtPeriodEnd: false,
-        status: 'canceled',
-        canceledAt: new Date(),
-        updatedAt: new Date(),
-      })
+      .set({ cancelAtPeriodEnd: false, status: 'canceled', canceledAt: new Date(), updatedAt: new Date() })
       .where(eq(subscriptions.id, sub.id));
     return { status: 'canceled', cancelAtPeriodEnd: false, canceledAt: new Date().toISOString() };
   }
 
-  /** PayPal has no generic "portal" — return billing page path for UI compatibility */
   async createPortalSession(_userId: string) {
     requirePayPalConfig();
     return { url: '/billing', provider: 'paypal' as const, note: 'Manage subscriptions from billing page or PayPal account' };
@@ -220,6 +202,7 @@ export class PayPalBillingService {
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.workspaceId, ws.id))
+      .orderBy(desc(subscriptions.updatedAt), desc(subscriptions.createdAt))
       .limit(1);
     const sub = rows[0];
     if (!sub) {
@@ -233,8 +216,7 @@ export class PayPalBillingService {
         externalId: null,
       };
     }
-    const planKey =
-      (Object.keys(PLAN_IDS) as PlanKey[]).find((k) => PLAN_IDS[k] === sub.planId) || null;
+    const planKey = (Object.keys(PLAN_IDS) as PlanKey[]).find((k) => PLAN_IDS[k] === sub.planId) || null;
     return {
       plan: planKey,
       planId: sub.planId,
@@ -247,5 +229,4 @@ export class PayPalBillingService {
       includedCredits: planKey ? PLAN_META[planKey].includedCredits : null,
     };
   }
-
 }

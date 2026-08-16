@@ -3,8 +3,8 @@ import { api } from './api';
 export type DownloadState = 'idle' | 'preparing' | 'downloading' | 'complete' | 'failed';
 
 /**
- * Secure download via Phase 10 export API (ownership checked server-side).
- * 0 credits. No social publishing.
+ * Secure download via the export API (ownership and readiness checked server-side).
+ * Preview and download do not consume credits and do not publish to social media.
  */
 export async function downloadAssetById(assetId: string): Promise<{ filename: string }> {
   const exp = await api.exportAsset(assetId);
@@ -23,11 +23,11 @@ export async function downloadAssetById(assetId: string): Promise<{ filename: st
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(objectUrl);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   return { filename: exp.filename || exp.name };
 }
 
-/** Fallback when only a verified job output URL exists (same-origin or public storage URL). */
+/** Fallback for a verified output URL when no asset id exists. */
 export async function downloadFromUrl(url: string, filename = 'aura-video.mp4'): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) throw new Error('VIDEO_DOWNLOAD_FAILED');
@@ -39,5 +39,5 @@ export async function downloadFromUrl(url: string, filename = 'aura-video.mp4'):
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(objectUrl);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }

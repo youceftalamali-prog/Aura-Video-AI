@@ -12,5 +12,21 @@ export function createAdminRoutes(controller: AdminController): Router {
   router.get('/settings', controller.listSettings);
   router.put('/settings/:key', controller.updateSetting);
 
+  router.get('/ai-providers', controller.listAiProviders);
+  router.post('/ai-providers', controller.createAiProvider);
+  router.patch('/ai-providers/:id', controller.updateAiProvider);
+  router.delete('/ai-providers/:id', controller.deleteAiProvider);
+  router.post('/ai-providers/:id/test', controller.testAiProvider);
+
+  router.get('/ai/models', controller.listAiModels);
+  router.post('/ai/models/refresh', controller.refreshAiModels);
+  router.put('/ai/models/allowlist', controller.updateAiModelAllowlist);
+
+  router.get('/feature-flags', controller.listFeatureFlags);
+  router.put('/feature-flags/:key', controller.updateFeatureFlag);
+  router.delete('/feature-flags/:key', controller.deleteFeatureFlag);
+
+  router.get('/system/health', controller.getSystemHealth);
+
   return router;
 }

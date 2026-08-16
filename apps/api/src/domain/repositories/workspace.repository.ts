@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { workspaces } from '../../db/schema.js';
 import type { CreateWorkspaceInput, Workspace } from '@aura/types';
@@ -21,7 +21,16 @@ export class WorkspaceRepository {
     const rows = await this.db
       .select()
       .from(workspaces)
-      .where(eq(workspaces.ownerId, ownerId))
+      .where(and(eq(workspaces.ownerId, ownerId), eq(workspaces.isPersonal, true)))
+      .limit(1);
+    return (rows[0] as unknown as Workspace | undefined) ?? null;
+  }
+
+  async findOwnedById(ownerId: string, workspaceId: string): Promise<Workspace | null> {
+    const rows = await this.db
+      .select()
+      .from(workspaces)
+      .where(and(eq(workspaces.id, workspaceId), eq(workspaces.ownerId, ownerId)))
       .limit(1);
     return (rows[0] as unknown as Workspace | undefined) ?? null;
   }

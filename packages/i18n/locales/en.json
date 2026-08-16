@@ -1,4 +1,64 @@
-{
+﻿{
+  "agent": {
+    "working": "Aura is working…",
+    "send": "Send",
+    "chooseModel": "AI model",
+    "defaultModel": "Default (Aura chooses)",
+    "fast": "Fast",
+    "balanced": "Balanced",
+    "smart": "Smart",
+    "strategyPick": "Approach",
+    "addProduct": "Product",
+    "chooseProduct": "Choose a product",
+    "importNewProduct": "Import a new product",
+    "productPickHint": "Aura will use this product as context for creating your video.",
+    "selectedProduct": "Product",
+    "selectedTemplate": "Template",
+    "clearSelection": "Remove",
+    "confirmTitle": "Aura needs your confirmation",
+    "confirmCredits": "Estimated cost: {{credits}} credits",
+    "confirmContinue": "Continue",
+    "confirmCancel": "Cancel",
+    "cancelReply": "cancel",
+    "useProduct": "Use the product {{name}} for creating my ad.",
+    "useTemplateFor": "Use the template {{name}}.",
+    "createWithTemplate": "Create my ad using the template {{name}}.",
+    "errorTitle": "Aura ran into an issue",
+    "retry": "Retry",
+    "videoReady": "Your video is ready",
+    "renderingNote": "Rendering in progress — the status updates automatically when it finishes.",
+    "templateContext": "Template",
+    "tool": {
+      "product.list": "Products listed",
+      "product.get": "Product loaded",
+      "product.import.url": "Product imported from URL",
+      "product.import.text": "Product imported from description",
+      "product.import.image": "Product imported from image",
+      "product.analyze": "Product analyzed",
+      "product.intelligence": "Product intelligence built",
+      "product.hooks": "Marketing hooks generated",
+      "creative.strategy": "Creative strategy created",
+      "creative.script": "Script created",
+      "creative.storyboard": "Storyboard created",
+      "creative.recommendTemplate": "Template recommended",
+      "template.list": "Templates listed",
+      "template.get": "Template loaded",
+      "video.create": "Video job created",
+      "video.status": "Video status checked",
+      "video.cancel": "Video cancelled",
+      "billing.balance": "Credit balance checked",
+      "settings.get": "Settings loaded"
+    },
+    "step": {
+      "product": "Product",
+      "strategy": "Strategy",
+      "script": "Script",
+      "storyboard": "Storyboard",
+      "template": "Template",
+      "video": "Video",
+      "render": "Render"
+    }
+  },
   "common": {
     "appName": "Aura Video AI",
     "loading": "Loading…",
@@ -86,11 +146,16 @@
     "failed": "Failed",
     "connectionId": "Connection ID",
     "selectProductFirst": "Select a product first",
-    "projectIdRequired": "Project ID and storyboard are required"
+    "projectIdRequired": "Project ID and storyboard are required",
+    "noResults": "No results",
+    "unknown": "Unknown",
+    "output": "Output",
+    "recommended": "Recommended",
+    "video": "Video"
   },
   "nav": {
-    "dashboard": "Dashboard",
-    "aiStudio": "AI Studio",
+    "dashboard": "Home",
+    "aiStudio": "Aura AI",
     "creative": "Creative",
     "video": "Video Studio",
     "products": "Products",
@@ -99,7 +164,8 @@
     "library": "Library",
     "billing": "Billing",
     "publishing": "Publishing",
-    "settings": "Settings"
+    "settings": "Settings",
+    "projects": "Projects"
   },
   "auth": {
     "loginTitle": "Sign in to Aura",
@@ -151,7 +217,8 @@
     "longDescription": "Long description",
     "summary": "Summary",
     "productLabel": "Product",
-    "recommendedNextStep": "Recommended next step"
+    "recommendedNextStep": "Recommended next step",
+    "productColon": "Product: "
   },
   "creative": {
     "title": "Creative Studio",
@@ -174,7 +241,14 @@
     "product": "Product",
     "template": "Template",
     "video": "Video",
-    "projectIdHint": "Use an existing project id you own"
+    "projectIdHint": "Use an existing project id you own",
+    "angleColon": "Angle: ",
+    "durationColon": "Duration: ",
+    "hookColon": "Hook: ",
+    "messageColon": "Message: ",
+    "pollingStatus": "Generating…",
+    "templateRecommendations": "Template recommendations",
+    "videoGenerationJob": "Video generation job"
   },
   "video": {
     "title": "Video Studio",
@@ -227,7 +301,12 @@
     "createVideoFailed": "Create video workflow failed",
     "loadFailed": "Failed to load products",
     "createVideoFailedShort": "Create video failed",
-    "importFlow": "URL, image, or description → AI product intelligence → Create video"
+    "importFlow": "URL, image, or description → AI product intelligence → Create video",
+    "factsVsMarketing": "Facts vs marketing",
+    "marketingAngles": "Marketing angles",
+    "marketingInferred": "Marketing (inferred)",
+    "primaryBenefit": "Primary benefit",
+    "productImport": "Product import"
   },
   "templates": {
     "title": "Templates",
@@ -253,7 +332,11 @@
     "ctaColon": "CTA:",
     "readyMade": "Ready-made templates",
     "chooseCategory": "Choose a category designed for your product.",
-    "categoryDesc": "Product-aware advertising templates for this category."
+    "categoryDesc": "Product-aware advertising templates for this category.",
+    "browseAll": "Browse all templates",
+    "openCategory": "Open category",
+    "premium": "Premium",
+    "all": "All"
   },
   "library": {
     "title": "Library",
@@ -264,7 +347,10 @@
     "createProject": "Create project",
     "failedToLoad": "Failed to load library",
     "emptyAssets": "No assets yet. Completed video generations appear here.",
-    "noProjects": "No projects yet. Create one or generate a video from a template."
+    "noProjects": "No projects yet. Create one or generate a video from a template.",
+    "openInStudio": "Open in studio",
+    "openVideo": "Open video",
+    "projectsAndAssets": "Projects & assets"
   },
   "billing": {
     "title": "Billing",
@@ -315,7 +401,9 @@
     "redirecting": "Redirecting to PayPal…",
     "creating": "Creating PayPal subscription…",
     "alreadyActive": "An active subscription already exists",
-    "period": "Billing period"
+    "period": "Billing period",
+    "creditsLower": "credits",
+    "planIdColon": "Plan ID: "
   },
   "errors": {
     "VIDEO_GENERATION_FAILED": "Video generation failed",
@@ -360,11 +448,90 @@
     "viewPost": "View post",
     "retry": "Retry"
   },
+  "home": {
+    "newAd": "Create ad",
+    "heroBadge": "AI Marketing Agent",
+    "heroSub": "Paste a product link, upload an image, or describe your product. Aura builds a TikTok-style vertical ad you can preview and download.",
+    "stepProduct": "Import product",
+    "stepAnalyze": "AI analysis",
+    "stepTemplate": "Template",
+    "stepRender": "Vertical video",
+    "templateSelected": "Template selected",
+    "templateHint": "I will use it for your ad once a product is ready."
+  },
   "status": {
     "pending": "Pending",
     "processing": "Processing",
     "completed": "Completed",
     "failed": "Failed",
-    "ready": "Ready"
+    "ready": "Ready",
+    "queued": "Queued",
+    "composing": "Composing",
+    "rendering": "Rendering",
+    "canceled": "Cancelled"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your profile, language and AI preferences.",
+    "profile": "Profile",
+    "verified": "Verified",
+    "unverified": "Unverified",
+    "languageTitle": "Language",
+    "language": "Interface language",
+    "appearanceTitle": "Appearance",
+    "appearance_light": "Light",
+    "appearance_dark": "Dark",
+    "appearance_system": "System",
+    "aiTitle": "AI preferences",
+    "defaultModel": "Default AI model",
+    "modelPlatformDefault": "Use platform default",
+    "modelHint": "{{count}} models available from connected providers",
+    "strategy": "Routing strategy",
+    "strategy_fast": "Fastest, lowest cost",
+    "strategy_balanced": "Balanced quality and cost",
+    "strategy_smart": "Best quality",
+    "videoTitle": "Video preferences",
+    "defaultDuration": "Default duration",
+    "aspectRatio": "Default aspect ratio",
+    "resolution": "Default resolution",
+    "videoLanguage": "Default video language",
+    "platformDefault": "Use platform default",
+    "notificationsTitle": "Notifications",
+    "notifEmailAlerts": "Email alerts",
+    "notifMarketing": "Marketing & product updates",
+    "notifAgentUpdates": "AI agent progress updates",
+    "notifBilling": "Billing and subscription alerts",
+    "securityTitle": "Security",
+    "accountEmail": "Account email",
+    "securityHint": "Password and sign-in security are managed from your account. Contact support for help.",
+    "subscriptionTitle": "Subscription & billing",
+    "subscriptionHint": "Manage your plan, credits and payment methods.",
+    "openBilling": "Open billing",
+    "saved": "Settings saved",
+    "saveFailed": "Failed to save settings",
+    "loadFailed": "Failed to load settings"
+  },
+  "workspace": {
+    "greetingMorning": "Good morning, {{name}}",
+    "greetingAfternoon": "Good afternoon, {{name}}",
+    "greetingEvening": "Good evening, {{name}}",
+    "whatToCreate": "What would you like Aura to create?",
+    "composerPlaceholder": "Describe what you want to create… e.g. a luxury 15-second ad for my gold necklace.",
+    "smartTemplates": "SMART TEMPLATES",
+    "viewAll": "View all",
+    "useTemplate": "Use template",
+    "recentVideos": "Recent Videos",
+    "recentProducts": "Recent Products",
+    "recentProjects": "Recent Projects",
+    "noVideos": "No videos yet — tell Aura what to create above and it will take care of it.",
+    "noProducts": "No products yet",
+    "noProjects": "No projects yet",
+    "importFirstProduct": "Import your first product",
+    "preview": "Preview",
+    "modelCapabilities": "{{capabilities}} · {{context}} context",
+    "modelPricing": "{{prompt}} / 1K in · {{completion}} / 1K out",
+    "composerHint": "Aura plans, creates, and generates the video for you from start to finish.",
+    "emptyChat": "Start here — describe your product or paste a link, and Aura designs your ad.",
+    "deepLinkError": "Couldn't load the item you selected ({{value}})."
   }
 }

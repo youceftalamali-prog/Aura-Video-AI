@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LanguageSelector } from './LanguageSelector';
 import { Button } from '@aura/ui';
-import { setAccessToken } from '../lib/api';
+import { clearTokens } from '../lib/api';
 
 const NAV = [
   { to: '/dashboard', key: 'nav.dashboard' },
@@ -13,13 +13,14 @@ const NAV = [
   { to: '/templates', key: 'nav.templates' },
   { to: '/library', key: 'nav.library' },
   { to: '/billing', key: 'nav.billing' },
+  { to: '/settings', key: 'nav.settings' },
 ] as const;
 
 export function AppShell({ children, title }: { children: React.ReactNode; title?: string }) {
   const { t } = useTranslation();
   const loc = useLocation();
   function signOut() {
-    setAccessToken(null);
+    clearTokens();
     window.location.href = '/login';
   }
   return (

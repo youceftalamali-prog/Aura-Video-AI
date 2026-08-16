@@ -9,7 +9,7 @@ export type TemplateCategory =
   | 'promo'
   | 'other';
 
-export type TemplateStatus = 'active' | 'draft' | 'archived';
+export type TemplateStatus = 'published' | 'active' | 'draft' | 'archived';
 
 export interface Template extends Timestamps {
   id: UUID;

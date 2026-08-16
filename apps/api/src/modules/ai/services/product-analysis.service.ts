@@ -1,4 +1,4 @@
-import type { ProductAnalysis, ProductUrlMetadata } from '@aura/types';
+import type { ProductAnalysis, ProductUrlMetadata, RoutingStrategy } from '@aura/types';
 import type { IAIProvider } from '../interfaces/ai-provider.interface.js';
 import type { IUrlMetadataExtractor } from '../interfaces/url-extractor.interface.js';
 
@@ -9,30 +9,36 @@ export class ProductAnalysisService {
   ) {}
 
   async analyzeFromText(input: {
-    language?: string;
-        name: string;
+    name: string;
     description: string;
     metadata?: Record<string, unknown>;
+    strategy?: RoutingStrategy;
   }): Promise<ProductAnalysis> {
-    return this.ai.analyzeProduct({
-            name: input.name,
-      description: input.description,
-      metadata: input.metadata,
-    });
+    return this.ai.analyzeProduct(
+      {
+        name: input.name,
+        description: input.description,
+        metadata: input.metadata,
+      },
+      { strategy: input.strategy },
+    );
   }
 
-  async analyzeFromUrl(url: string): Promise<{
+  async analyzeFromUrl(url: string, strategy?: RoutingStrategy): Promise<{
     analysis: ProductAnalysis;
     metadata: ProductUrlMetadata;
   }> {
     const metadata = await this.urlExtractor.extract(url);
-    const analysis = await this.ai.analyzeProduct({
-      name: metadata.title ?? undefined,
-      description: metadata.description ?? metadata.rawTextSnippet ?? undefined,
-      url,
-      imageUrl: metadata.images[0],
-      extractedMeta: metadata,
-    });
+    const analysis = await this.ai.analyzeProduct(
+      {
+        name: metadata.title ?? undefined,
+        description: metadata.description ?? metadata.rawTextSnippet ?? undefined,
+        url,
+        imageUrl: metadata.images[0],
+        extractedMeta: metadata,
+      },
+      { strategy },
+    );
     return { analysis, metadata };
   }
 
@@ -42,13 +48,17 @@ export class ProductAnalysisService {
     mimeType?: string;
     name?: string;
     description?: string;
+    strategy?: RoutingStrategy;
   }): Promise<ProductAnalysis> {
-    return this.ai.analyzeProduct({
-            name: input.name,
-      description: input.description,
-      imageUrl: input.imageUrl,
-      imageBase64: input.imageBase64,
-      mimeType: input.mimeType,
-    });
+    return this.ai.analyzeProduct(
+      {
+        name: input.name,
+        description: input.description,
+        imageUrl: input.imageUrl,
+        imageBase64: input.imageBase64,
+        mimeType: input.mimeType,
+      },
+      { strategy: input.strategy },
+    );
   }
 }

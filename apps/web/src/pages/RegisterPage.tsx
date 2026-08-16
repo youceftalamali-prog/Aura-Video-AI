@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, Alert } from '@aura/ui';
-import { api, setAccessToken } from '../lib/api';
+import { api, setTokens } from '../lib/api';
 import { LanguageSelector } from '../components/LanguageSelector';
 
 export function RegisterPage() {
@@ -20,8 +20,7 @@ export function RegisterPage() {
     setLoading(true);
     try {
       const data = await api.register({ fullName, email, password });
-      setAccessToken(data.tokens.accessToken);
-      // refresh optional
+      setTokens(data.tokens.accessToken, data.tokens.refreshToken);
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.registerFailed'));

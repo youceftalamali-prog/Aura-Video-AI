@@ -51,7 +51,7 @@ export class TemplateLibraryService {
         category: seed.category,
         subCategory: seed.subCategory ?? null,
         durationSeconds: seed.durationSeconds,
-        aspectRatio: '9:16',
+        aspectRatio: seed.aspectRatio ?? '9:16',
         status: 'published',
         isFeatured: seed.isFeatured ?? false,
         sortOrder: 0,

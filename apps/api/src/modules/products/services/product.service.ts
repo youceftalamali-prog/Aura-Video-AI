@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   ProductImportResult,
   ProductIntelligence,
@@ -8,9 +9,11 @@ import type {
   CreateVideoFromProductResult,
   GeneratedHook,
   ProductAnalysis,
+  RoutingStrategy,
 } from '@aura/types';
-import { NotFoundError } from '@aura/shared';
+import { AppError, NotFoundError } from '@aura/shared';
 import type { ProductRepository } from './product.repository.js';
+import type { ProductIntelligenceRepository } from './product-intelligence.repository.js';
 import type { UrlImportService } from './url-import.service.js';
 import type { ProductIntelligenceService } from './product-intelligence.service.js';
 import type { ProductAnalysisService } from '../../ai/services/product-analysis.service.js';
@@ -36,6 +39,7 @@ export class ProductService {
     private readonly storyboard: StoryboardService,
     private readonly templates: TemplateService,
     private readonly credits: CreditLedgerService | null,
+    private readonly intelligenceRepo: ProductIntelligenceRepository | null = null,
   ) {}
 
   async list(userId: string): Promise<ProductRecord[]> {
@@ -53,21 +57,23 @@ export class ProductService {
     if (!ok) throw new NotFoundError('Product');
   }
 
-  async importUrl(userId: string, workspaceId: string, url: string): Promise<ProductImportResult> {
+  async importUrl(userId: string, workspaceId: string, url: string, strategy?: RoutingStrategy): Promise<ProductImportResult> {
     log('import_started', { source: 'url', userId });
-    await this.maybeCharge(workspaceId);
+    const operationKey = randomUUID();
+    await this.maybeCharge(workspaceId, userId, operationKey);
     try {
       const extracted = await this.urlImport.extract(url);
       const analysis = await this.analysis.analyzeFromText({
         name: extracted.name || 'Untitled product',
         description: extracted.description || extracted.rawFacts.description || extracted.name || 'Product',
         metadata: { sourceUrl: url, extracted },
+        strategy,
       });
       analysis.sourceType = 'url';
       analysis.sourceUrl = url;
       analysis.imageUrl = extracted.images[0] ?? null;
 
-      const intel = await this.intelligence.build(analysis, extracted);
+      const intel = await this.intelligence.build(analysis, extracted, strategy);
       const product = await this.repo.create({
         workspaceId,
         userId,
@@ -79,25 +85,28 @@ export class ProductService {
         externalSource: extracted.sourcePlatform,
         metadata: { intelligence: intel, extracted, analysis },
       });
+      await this.intelligenceRepo?.saveReady(product.id, intel, extracted);
       log('import_completed', { productId: product.id, source: 'url' });
       return { product, intelligence: intel, extracted };
     } catch (err) {
-      await this.maybeRefund(workspaceId);
+      await this.maybeRefund(workspaceId, userId, operationKey);
       throw err;
     }
   }
 
   async importText(userId: string, workspaceId: string, input: ImportTextInput): Promise<ProductImportResult> {
     log('import_started', { source: 'text', userId });
-    await this.maybeCharge(workspaceId);
+    const operationKey = randomUUID();
+    await this.maybeCharge(workspaceId, userId, operationKey);
     try {
       const analysis = await this.analysis.analyzeFromText({
         name: input.name,
         description: input.description,
         metadata: { brand: input.brand, price: input.price },
+        strategy: input.strategy,
       });
       analysis.sourceType = 'text';
-      const intel = await this.intelligence.build(analysis, null);
+      const intel = await this.intelligence.build(analysis, null, input.strategy);
       const product = await this.repo.create({
         workspaceId,
         userId,
@@ -108,16 +117,18 @@ export class ProductService {
         externalSource: 'text',
         metadata: { intelligence: intel, analysis },
       });
+      await this.intelligenceRepo?.saveReady(product.id, intel, null);
       return { product, intelligence: intel, extracted: null };
     } catch (err) {
-      await this.maybeRefund(workspaceId);
+      await this.maybeRefund(workspaceId, userId, operationKey);
       throw err;
     }
   }
 
   async importImage(userId: string, workspaceId: string, input: ImportImageInput): Promise<ProductImportResult> {
     log('import_started', { source: 'image', userId });
-    await this.maybeCharge(workspaceId);
+    const operationKey = randomUUID();
+    await this.maybeCharge(workspaceId, userId, operationKey);
     try {
       const analysis = await this.analysis.analyzeFromImage({
         imageUrl: input.imageUrl,
@@ -125,10 +136,11 @@ export class ProductService {
         mimeType: input.mimeType,
         name: input.name,
         description: input.description,
+        strategy: input.strategy,
       });
       analysis.sourceType = 'image';
       analysis.imageUrl = input.imageUrl ?? analysis.imageUrl;
-      const intel = await this.intelligence.build(analysis, null);
+      const intel = await this.intelligence.build(analysis, null, input.strategy);
       const product = await this.repo.create({
         workspaceId,
         userId,
@@ -138,30 +150,62 @@ export class ProductService {
         externalSource: 'image',
         metadata: { intelligence: intel, analysis },
       });
+      await this.intelligenceRepo?.saveReady(product.id, intel, null);
       return { product, intelligence: intel, extracted: null };
     } catch (err) {
-      await this.maybeRefund(workspaceId);
+      await this.maybeRefund(workspaceId, userId, operationKey);
       throw err;
     }
   }
 
   async getIntelligence(userId: string, productId: string): Promise<ProductIntelligence> {
     const product = await this.get(userId, productId);
+    const stored = await this.intelligenceRepo?.getByProductId(productId);
+    if (stored?.status === 'ready') {
+      if (stored.intelligence) return stored.intelligence;
+      throw new AppError('Product intelligence is unavailable', 503, 'PRODUCT_INTELLIGENCE_FAILED');
+    }
+    if (stored?.status === 'failed') {
+      throw new AppError('Product intelligence is unavailable', 503, 'PRODUCT_INTELLIGENCE_FAILED', {
+        errorCode: stored.errorCode,
+        version: stored.version,
+      });
+    }
+
     const meta = product.metadata || {};
     if (meta.intelligence) return meta.intelligence as unknown as ProductIntelligence;
-    // re-analyze
-    const analysis = (meta.analysis as unknown as ProductAnalysis) || (await this.analysis.analyzeFromText({
-      name: product.name,
-      description: product.description || product.name,
-    }));
-    const intel = await this.intelligence.build(analysis, (meta.extracted as never) || null);
-    await this.repo.updateMetadata(productId, { ...meta, intelligence: intel, analysis });
-    return intel;
+    return this.refreshIntelligence(userId, productId);
   }
 
-  async generateHooks(userId: string, productId: string): Promise<GeneratedHook[]> {
+  async refreshIntelligence(
+    userId: string,
+    productId: string,
+    strategy?: RoutingStrategy,
+  ): Promise<ProductIntelligence> {
+    const product = await this.get(userId, productId);
+    const meta = product.metadata || {};
+    try {
+      const extracted = (meta.extracted as unknown as import('@aura/types').ExtractedProductData) || null;
+      const analysis =
+        (meta.analysis as unknown as ProductAnalysis) ||
+        (await this.analysis.analyzeFromText({
+          name: product.name,
+          description: product.description || product.name,
+          strategy,
+        }));
+      const intel = await this.intelligence.build(analysis, extracted, strategy);
+      await this.repo.updateMetadata(productId, { ...meta, intelligence: intel, analysis });
+      await this.intelligenceRepo?.saveReady(productId, intel, extracted);
+      return intel;
+    } catch (err) {
+      await this.intelligenceRepo?.markFailed(productId, err instanceof Error ? err.name : 'PRODUCT_INTELLIGENCE_FAILED');
+      throw err;
+    }
+  }
+
+  async generateHooks(userId: string, productId: string, strategy?: RoutingStrategy): Promise<GeneratedHook[]> {
     const intel = await this.getIntelligence(userId, productId);
-    return this.intelligence.generateHooks(intel.analysis, intel);
+    return this.intelligence.generateHooks(intel.analysis, intel, strategy);
   }
 
   async createVideoWorkflow(
@@ -226,19 +270,31 @@ export class ProductService {
     };
   }
 
-  private async maybeCharge(workspaceId: string): Promise<void> {
+  private async maybeCharge(workspaceId: string, userId: string, operationKey: string): Promise<void> {
     const env = getEnv();
     if (!env.PRODUCT_ANALYSIS_ENABLED_BILLING || !this.credits) return;
     const amount = env.PRODUCT_ANALYSIS_CREDITS;
     if (amount <= 0) return;
-    await this.credits.deduct(workspaceId, amount);
+    await this.credits.deduct(workspaceId, amount, {
+      userId,
+      description: 'Product analysis charge',
+      referenceType: 'product_analysis',
+      referenceId: operationKey,
+      idempotencyKey: `product:analysis:charge:${operationKey}`,
+    });
   }
 
-  private async maybeRefund(workspaceId: string): Promise<void> {
+  private async maybeRefund(workspaceId: string, userId: string, operationKey: string): Promise<void> {
     const env = getEnv();
     if (!env.PRODUCT_ANALYSIS_ENABLED_BILLING || !this.credits) return;
     const amount = env.PRODUCT_ANALYSIS_CREDITS;
     if (amount <= 0) return;
-    await this.credits.refund(workspaceId, amount);
+    await this.credits.refund(workspaceId, amount, {
+      userId,
+      description: 'Refund for failed product analysis',
+      referenceType: 'product_analysis_refund',
+      referenceId: operationKey,
+      idempotencyKey: `product:analysis:refund:${operationKey}`,
+    });
   }
 }

@@ -12,11 +12,7 @@ export class UserRepository {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const rows = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.email, email.toLowerCase()))
-      .limit(1);
+    const rows = await this.db.select().from(users).where(eq(users.email, email.toLowerCase())).limit(1);
     return (rows[0] as unknown as User | undefined) ?? null;
   }
 
@@ -25,7 +21,7 @@ export class UserRepository {
     return (rows[0] as unknown as User | undefined) ?? null;
   }
 
-  async create(input: CreateUserInput & { passwordHash?: string | null }): Promise<User> {
+  async create(input: CreateUserInput & { passwordHash?: string | null; emailVerifiedAt?: Date | null }): Promise<User> {
     const rows = await this.db
       .insert(users)
       .values({
@@ -34,6 +30,7 @@ export class UserRepository {
         fullName: input.fullName,
         googleId: input.googleId ?? null,
         avatarUrl: input.avatarUrl ?? null,
+        emailVerifiedAt: input.emailVerifiedAt ?? null,
         role: 'user',
         status: 'active',
       })
@@ -42,22 +39,21 @@ export class UserRepository {
   }
 
   async update(id: string, input: UpdateUserInput): Promise<User | null> {
-    const rows = await this.db
-      .update(users)
-      .set({
-        ...input,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, id))
-      .returning();
+    const rows = await this.db.update(users).set({ ...input, updatedAt: new Date() }).where(eq(users.id, id)).returning();
     return (rows[0] as unknown as User | undefined) ?? null;
   }
 
   async updateLastLogin(id: string): Promise<void> {
-    await this.db
+    await this.db.update(users).set({ lastLoginAt: new Date(), updatedAt: new Date() }).where(eq(users.id, id));
+  }
+
+  async updateGoogleId(userId: string, googleId: string): Promise<User | null> {
+    const rows = await this.db
       .update(users)
-      .set({ lastLoginAt: new Date(), updatedAt: new Date() })
-      .where(eq(users.id, id));
+      .set({ googleId, emailVerifiedAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return (rows[0] as unknown as User | undefined) ?? null;
   }
 
   toPublic(user: User): PublicUser {
@@ -76,13 +72,8 @@ export class UserRepository {
 
   async list(limit = 50, offset = 0): Promise<{ users: User[]; total: number }> {
     const rows = await this.db.select().from(users).limit(limit).offset(offset);
-    const countResult = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(users);
-    return {
-      users: rows as unknown as User[],
-      total: countResult[0]?.count ?? 0,
-    };
+    const countResult = await this.db.select({ count: sql<number>`count(*)::int` }).from(users);
+    return { users: rows as unknown as User[], total: countResult[0]?.count ?? 0 };
   }
 
   async updatePreferredLanguage(userId: string, preferredLanguage: string) {
@@ -93,5 +84,4 @@ export class UserRepository {
       .returning();
     return row ? this.toPublic(row as unknown as User) : null;
   }
-
 }

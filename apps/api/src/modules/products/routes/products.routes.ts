@@ -25,6 +25,7 @@ export function createProductsRoutes(controller: ProductsController): Router {
   router.post('/import/text', controller.importText);
   router.post('/import/image', controller.importImage);
 
+  router.post('/:id/intelligence/refresh', controller.refreshIntelligence);
   router.get('/:id/intelligence', controller.intelligence);
   router.post('/:id/hooks', controller.hooks);
   router.post('/:id/create-video', controller.createVideo);

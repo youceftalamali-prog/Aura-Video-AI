@@ -23,7 +23,7 @@ const envSchema = z.object({
   ADMIN_URL: z.string().url().default('http://localhost:5174'),
   API_URL: z.string().url().default('http://localhost:3001'),
 
-  CORS_ORIGINS: z.string().default('http://localhost:5173,http://localhost:5174'),
+  CORS_ORIGINS: z.string().default('http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174'),
 
   R2_ACCOUNT_ID: z.string().optional().default(''),
   R2_ACCESS_KEY_ID: z.string().optional().default(''),
@@ -54,6 +54,12 @@ const envSchema = z.object({
   AI_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.3),
   AI_TIMEOUT_MS: z.coerce.number().default(60000),
   AI_RATE_LIMIT_MAX: z.coerce.number().default(20),
+
+  // OpenRouter provider (Phase B, additive; excluded when no key is set)
+  OPENROUTER_API_KEY: z.string().optional().default(''),
+  OPENROUTER_BASE_URL: z.string().url().optional().default('https://openrouter.ai/api/v1'),
+  OPENROUTER_DEFAULT_MODEL: z.string().optional().default(''),
+  OPENROUTER_CATALOG_TTL_MS: z.coerce.number().optional().default(3600000),
 
   // Media / Video generation providers
   MEDIA_PROVIDER: z

@@ -1,9 +1,8 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthenticatedRequest } from '../../../infrastructure/http/middleware/auth.middleware.js';
 import type { LibraryService } from '../services/library.service.js';
-import { createProjectBodySchema, updateProjectBodySchema } from '../dto/schemas.js';
+import { assetTypeSchema, createProjectBodySchema, updateProjectBodySchema } from '../dto/schemas.js';
 import type { ApiResponse } from '@aura/types';
-import { z } from 'zod';
 
 export class LibraryController {
   constructor(private readonly library: LibraryService) {}
@@ -47,7 +46,7 @@ export class LibraryController {
 
   listAssets = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const type = req.query.type ? z.string().max(20).parse(req.query.type) : undefined;
+      const type = req.query.type === undefined ? undefined : assetTypeSchema.parse(req.query.type);
       const data = await this.library.listAssets(req.user!.sub, type);
       res.json({ success: true, data } satisfies ApiResponse);
     } catch (e) { next(e); }

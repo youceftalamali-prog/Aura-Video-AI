@@ -30,14 +30,14 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const googleOAuthCallbackSchema = z.object({
+  code: z.string().min(1).max(4096),
+  state: z.string().min(16).max(1024),
+});
+
 export const createWorkspaceSchema = z.object({
   name: z.string().min(2).max(100).trim(),
-  slug: z
-    .string()
-    .min(2)
-    .max(50)
-    .regex(/^[a-z0-9-]+$/)
-    .optional(),
+  slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/).optional(),
 });
 
 export const createProjectSchema = z.object({

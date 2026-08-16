@@ -13,6 +13,7 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { isNull } from 'drizzle-orm';
 
 export const users = pgTable(
   'users',
@@ -187,6 +188,7 @@ export const projects = pgTable(
     status: varchar('status', { length: 20 }).notNull().default('draft'),
     templateId: uuid('template_id').references(() => templates.id, { onDelete: 'set null' }),
     productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
+    videoAssetId: uuid('video_asset_id').references(() => assets.id, { onDelete: 'set null' }),
     thumbnailUrl: text('thumbnail_url'),
     videoUrl: text('video_url'),
     durationSeconds: integer('duration_seconds'),
@@ -200,6 +202,7 @@ export const projects = pgTable(
     workspaceIdIdx: index('projects_workspace_id_idx').on(table.workspaceId),
     userIdIdx: index('projects_user_id_idx').on(table.userId),
     statusIdx: index('projects_status_idx').on(table.status),
+    videoAssetIdIdx: index('projects_video_asset_id_idx').on(table.videoAssetId),
   }),
 );
 
@@ -218,6 +221,7 @@ export const subscriptions = pgTable(
     interval: varchar('interval', { length: 10 }).notNull().default('month'),
     currentPeriodStart: timestamp('current_period_start', { withTimezone: true }).notNull(),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
+    periodCreditsGranted: boolean('period_credits_granted').notNull().default(false),
     cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
     canceledAt: timestamp('canceled_at', { withTimezone: true }),
     trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
@@ -250,7 +254,6 @@ export const creditWallets = pgTable(
     workspaceIdIdx: uniqueIndex('credit_wallets_workspace_id_idx').on(table.workspaceId),
   }),
 );
-
 
 export const videoGenerationJobs = pgTable(
   'video_generation_jobs',
@@ -314,6 +317,7 @@ export const projectsRelations = relations(projects, ({ one }) => ({
   user: one(users, { fields: [projects.userId], references: [users.id] }),
   template: one(templates, { fields: [projects.templateId], references: [templates.id] }),
   product: one(products, { fields: [projects.productId], references: [products.id] }),
+  videoAsset: one(assets, { fields: [projects.videoAssetId], references: [assets.id] }),
 }));
 
 export const assetsRelations = relations(assets, ({ one }) => ({
@@ -326,7 +330,6 @@ export const productsRelations = relations(products, ({ one }) => ({
   user: one(users, { fields: [products.userId], references: [users.id] }),
   imageAsset: one(assets, { fields: [products.imageAssetId], references: [assets.id] }),
 }));
-
 
 export const paypalWebhookEvents = pgTable(
   'paypal_webhook_events',
@@ -362,7 +365,6 @@ export const creditWalletsRelations = relations(creditWallets, ({ one }) => ({
     references: [workspaces.id],
   }),
 }));
-
 
 export const socialConnections = pgTable(
   'social_connections',
@@ -435,4 +437,118 @@ export const publishingJobs = pgTable(
       table.idempotencyKey,
     ),
   }),
+);
+
+export const aiProviderConfigs = pgTable(
+  'ai_provider_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    // NULL = system/default scope; set = workspace-specific override
+    workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+    providerId: varchar('provider_id', { length: 40 }).notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    baseUrl: varchar('base_url', { length: 500 }),
+    encryptedApiKey: text('encrypted_api_key'),
+    defaultModelId: varchar('default_model_id', { length: 200 }),
+    capabilities: jsonb('capabilities').notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    workspaceProviderIdx: uniqueIndex('ai_provider_configs_workspace_provider_idx').on(
+      table.workspaceId,
+      table.providerId,
+    ),
+    systemProviderIdx: uniqueIndex('ai_provider_configs_system_provider_idx')
+      .on(table.providerId)
+      .where(isNull(table.workspaceId)),
+    workspaceIdx: index('ai_provider_configs_workspace_idx').on(table.workspaceId),
+  }),
+);
+
+export const aiProviderConfigsRelations = relations(aiProviderConfigs, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [aiProviderConfigs.workspaceId],
+    references: [workspaces.id],
+  }),
+}));
+
+export const agentConversations = pgTable(
+  'agent_conversations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 200 }).notNull().default('New conversation'),
+    status: varchar('status', { length: 20 }).notNull().default('active'),
+    selectedProductId: uuid('selected_product_id').references(() => products.id, { onDelete: 'set null' }),
+    selectedTemplateId: uuid('selected_template_id').references(() => templates.id, { onDelete: 'set null' }),
+    activeVideoJobId: uuid('active_video_job_id').references(() => videoGenerationJobs.id, { onDelete: 'set null' }),
+    language: varchar('language', { length: 20 }),
+    pendingConfirmation: jsonb('pending_confirmation'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('agent_conversations_user_id_idx').on(table.userId),
+    workspaceIdIdx: index('agent_conversations_workspace_id_idx').on(table.workspaceId),
+  }),
+);
+
+export const agentMessages = pgTable(
+  'agent_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => agentConversations.id, { onDelete: 'cascade' }),
+    role: varchar('role', { length: 20 }).notNull(),
+    content: text('content'),
+    toolName: varchar('tool_name', { length: 120 }),
+    toolArgs: jsonb('tool_args'),
+    toolResult: jsonb('tool_result'),
+    modelInfo: jsonb('model_info'),
+    step: integer('step'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    conversationIdx: index('agent_messages_conversation_idx').on(table.conversationId, table.createdAt),
+  }),
+);
+
+export const userPreferences = pgTable(
+  'user_preferences',
+  {
+    userId: uuid('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    language: varchar('language', { length: 10 }),
+    appearance: varchar('appearance', { length: 20 }),
+    defaultAiModel: varchar('default_ai_model', { length: 200 }),
+    aiStrategy: varchar('ai_strategy', { length: 20 }),
+    defaultVideoDuration: integer('default_video_duration'),
+    defaultAspectRatio: varchar('default_aspect_ratio', { length: 10 }),
+    defaultResolution: varchar('default_resolution', { length: 10 }),
+    defaultVideoLanguage: varchar('default_video_language', { length: 10 }),
+    notifications: jsonb('notifications').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
+export const workspaceSettings = pgTable(
+  'workspace_settings',
+  {
+    workspaceId: uuid('workspace_id')
+      .primaryKey()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    defaultAiModel: varchar('default_ai_model', { length: 200 }),
+    aiStrategy: varchar('ai_strategy', { length: 20 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
 );

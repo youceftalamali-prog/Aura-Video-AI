@@ -24,7 +24,13 @@ export class CreditRepository {
         lifetimeGranted: initialBalance,
         lifetimeUsed: 0,
       })
+      .onConflictDoNothing({ target: creditWallets.workspaceId })
       .returning();
-    return rows[0] as unknown as CreditWallet;
+
+    if (rows[0]) return rows[0] as unknown as CreditWallet;
+
+    const existing = await this.findByWorkspaceId(workspaceId);
+    if (!existing) throw new Error('Credit wallet could not be created');
+    return existing;
   }
 }
