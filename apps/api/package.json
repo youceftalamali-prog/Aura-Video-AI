@@ -44,9 +44,7 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.0",
     "stripe": "^17.4.0",
-    "pg": "^8.13.0",
     "uuid": "^10.0.0",
-    "stripe": "^17.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
