@@ -5,6 +5,8 @@ import type { AuthService } from '../../../domain/services/auth.service.js';
 import type { ApiResponse, AuthResponse, PublicUser } from '@aura/types';
 import { GoogleOAuthService, GOOGLE_OAUTH_STATE_COOKIE } from '../../auth/google-oauth.service.js';
 
+const GOOGLE_OAUTH_COOKIE_PATH = '/api/v1/auth/google';
+
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -80,7 +82,10 @@ export class AuthController {
     try {
       const request = this.googleOAuth.createAuthorizationUrl();
       res.cookie(GOOGLE_OAUTH_STATE_COOKIE, request.stateCookie, {
-        ...this.googleCookieOptions(),
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: GOOGLE_OAUTH_COOKIE_PATH,
         maxAge: request.maxAgeMs,
       });
       res.status(200).json({ success: true, data: { authorizationUrl: request.url } } satisfies ApiResponse);
@@ -89,7 +94,7 @@ export class AuthController {
 
   googleCallback = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const input = googleOAuthCallbackSchema.parse(req.method === 'GET' ? req.query : req.body);
+      const input = googleOAuthCallbackSchema.parse(req.query);
       const stateCookie = req.cookies?.[GOOGLE_OAUTH_STATE_COOKIE] as string | undefined;
       if (!this.googleOAuth.verifyState(input.state, stateCookie)) {
         this.clearGoogleCookie(res);
@@ -110,16 +115,12 @@ export class AuthController {
     }
   };
 
-  private googleCookieOptions() {
-    return {
+  private clearGoogleCookie(res: Response): void {
+    res.clearCookie(GOOGLE_OAUTH_STATE_COOKIE, {
       httpOnly: true,
       secure: true,
-      sameSite: 'lax' as const,
-      path: '/api/v1/auth/google',
-    };
-  }
-
-  private clearGoogleCookie(res: Response): void {
-    res.clearCookie(GOOGLE_OAUTH_STATE_COOKIE, this.googleCookieOptions());
+      sameSite: 'lax',
+      path: GOOGLE_OAUTH_COOKIE_PATH,
+    });
   }
 }

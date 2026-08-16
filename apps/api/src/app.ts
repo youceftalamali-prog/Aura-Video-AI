@@ -1,4 +1,4 @@
-import express, { type Express, type NextFunction, type Request, type Response } from 'express';
+import express, { type Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -27,32 +27,6 @@ function contentTypeForKey(key: string): string {
     case 'webp': return 'image/webp';
     default: return 'application/octet-stream';
   }
-}
-
-function createCsrfOriginProtection(allowedOrigins: ReadonlySet<string>) {
-  const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
-  const oauthCallbackPath = `${APP_CONSTANTS.API_PREFIX}/auth/google/callback`;
-
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (safeMethods.has(req.method) || req.path === oauthCallbackPath) {
-      next();
-      return;
-    }
-
-    // Requests without an Origin header are non-browser clients or signed provider
-    // webhooks. Browser requests that can carry cookies must originate from an
-    // explicitly allowed frontend origin.
-    const origin = req.get('origin');
-    if (!origin || allowedOrigins.has(origin)) {
-      next();
-      return;
-    }
-
-    res.status(403).json({
-      success: false,
-      error: { code: 'CSRF_ORIGIN_REJECTED', message: 'Request origin is not allowed' },
-    });
-  };
 }
 
 export function createApp(): Express {
@@ -85,8 +59,10 @@ export function createApp(): Express {
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
-  app.use(cookieParser());
-  app.use(createCsrfOriginProtection(allowedOrigins));
+
+  // Cookies are used only for the short-lived OAuth state on GET routes. Keeping
+  // the parser scoped avoids exposing cookie middleware to state-changing APIs.
+  app.use(`${APP_CONSTANTS.API_PREFIX}/auth/google`, cookieParser());
 
   app.use(
     rateLimit({
