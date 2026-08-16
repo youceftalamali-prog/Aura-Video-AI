@@ -8,6 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "worker": "tsx src/worker.ts",
     "typecheck": "tsc --noEmit",
     "test:security": "tsx scripts/security-deterministic-test.ts",
     "test:ai-gateway": "tsx scripts/ai-gateway-deterministic-test.ts",
@@ -35,7 +36,6 @@
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
     "drizzle-orm": "^0.45.2",
     "express": "^4.21.1",
     "express-rate-limit": "^7.4.1",
@@ -44,7 +44,9 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.0",
     "stripe": "^17.4.0",
+    "pg": "^8.13.0",
     "uuid": "^10.0.0",
+    "stripe": "^17.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
