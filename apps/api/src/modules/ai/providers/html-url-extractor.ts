@@ -87,13 +87,7 @@ export class HtmlUrlMetadataExtractor implements IUrlMetadataExtractor {
       if (!images.includes(absolute)) images.push(absolute);
     }
 
-    const rawTextSnippet = html
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 3000);
+    const rawTextSnippet = this.extractText(html).slice(0, 3000);
 
     return { url, title, description, images, siteName, rawTextSnippet: rawTextSnippet || null };
   }
@@ -111,6 +105,47 @@ export class HtmlUrlMetadataExtractor implements IUrlMetadataExtractor {
     return value
       .replace(/&(amp|lt|gt|quot|#39|apos);/g, (entity) => entities[entity] ?? entity)
       .trim();
+  }
+
+  private extractText(html: string): string {
+    let text = '';
+    let index = 0;
+    const lowerHtml = html.toLowerCase();
+
+    while (index < html.length) {
+      if (html[index] !== '<') {
+        text += html[index];
+        index += 1;
+        continue;
+      }
+
+      const tagEnd = html.indexOf('>', index + 1);
+      if (tagEnd === -1) break;
+
+      let cursor = index + 1;
+      while (cursor < tagEnd && (lowerHtml[cursor] === '/' || lowerHtml[cursor] === ' ' || lowerHtml[cursor] === '\t' || lowerHtml[cursor] === '\n' || lowerHtml[cursor] === '\r')) {
+        cursor += 1;
+      }
+      const nameStart = cursor;
+      while (cursor < tagEnd && ((lowerHtml[cursor] >= 'a' && lowerHtml[cursor] <= 'z') || (lowerHtml[cursor] >= '0' && lowerHtml[cursor] <= '9'))) {
+        cursor += 1;
+      }
+      const tagName = lowerHtml.slice(nameStart, cursor);
+      const isClosingTag = lowerHtml[index + 1] === '/';
+
+      if (!isClosingTag && (tagName === 'script' || tagName === 'style')) {
+        const closingTag = `</${tagName}`;
+        const closingStart = lowerHtml.indexOf(closingTag, tagEnd + 1);
+        if (closingStart === -1) break;
+        const closingEnd = html.indexOf('>', closingStart + closingTag.length);
+        index = closingEnd === -1 ? html.length : closingEnd + 1;
+      } else {
+        index = tagEnd + 1;
+      }
+      text += ' ';
+    }
+
+    return text.replace(/\s+/g, ' ').trim();
   }
 
   private absolutize(base: string, href: string): string {
