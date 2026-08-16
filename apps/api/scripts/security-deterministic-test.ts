@@ -1,5 +1,5 @@
 /**
- * Phase 1 security checks. They use no database, network, provider, or paid call.
+ * Security checks. They use no database, network, provider, or paid call.
  * Run with: pnpm --filter @aura/api test:security
  */
 process.env.NODE_ENV = 'test';
@@ -7,8 +7,10 @@ process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/aura_test_dumm
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.JWT_SECRET = 'security-test-secret-0123456789abcdef0123456789';
 
+import jwt from 'jsonwebtoken';
 import { lookup } from 'node:dns/promises';
 import { assertSafeRemoteUrl, isBlockedIPv4, isBlockedIPv6, readResponseText } from '../src/infrastructure/security/url-safety.js';
+import { signAccessToken, signRefreshToken, verifyToken } from '../src/infrastructure/auth/jwt.js';
 import {
   createStorageToken,
   decodeStorageKey,
@@ -68,6 +70,28 @@ async function main(): Promise<void> {
   const smallResponse = new Response('safe');
   check('reads response under limit', (await readResponseText(smallResponse, 10)) === 'safe');
   await rejects('rejects response over limit', () => readResponseText(new Response('0123456789'), 5));
+
+  console.log('JWT trust-boundary checks');
+  const payload = { sub: 'user-1', email: 'user@example.com', role: 'user' };
+  const accessToken = signAccessToken(payload);
+  const refreshToken = signRefreshToken(payload);
+  check('accepts a correctly scoped access token', verifyToken(accessToken, 'access').sub === payload.sub);
+  check('accepts a correctly scoped refresh token', verifyToken(refreshToken, 'refresh').sub === payload.sub);
+  await rejects('rejects an access token as a refresh token', async () => verifyToken(accessToken, 'refresh'));
+  const wrongIssuerToken = jwt.sign({ ...payload, type: 'access' }, process.env.JWT_SECRET!, {
+    algorithm: 'HS256',
+    audience: 'aura-video-ai-client',
+    issuer: 'untrusted-service',
+    expiresIn: '1m',
+  });
+  await rejects('rejects a token from another issuer', async () => verifyToken(wrongIssuerToken, 'access'));
+  const wrongAudienceToken = jwt.sign({ ...payload, type: 'access' }, process.env.JWT_SECRET!, {
+    algorithm: 'HS256',
+    audience: 'another-client',
+    issuer: 'aura-video-ai',
+    expiresIn: '1m',
+  });
+  await rejects('rejects a token for another audience', async () => verifyToken(wrongAudienceToken, 'access'));
 
   console.log('Signed local storage URL checks');
   const key = 'videos/workspace-1/job-1.mp4';
