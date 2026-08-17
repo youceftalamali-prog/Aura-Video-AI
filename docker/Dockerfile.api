@@ -1,7 +1,9 @@
+# syntax=docker/dockerfile:1
 FROM node:20-bookworm-slim AS base
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
 
+# ---------- deps ----------
 FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages/types/package.json ./packages/types/
@@ -10,11 +12,12 @@ COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
 RUN pnpm install --frozen-lockfile
 
+# ---------- builder ----------
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages ./packages
 COPY --from=deps /app/apps/api ./apps/api
-COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/api ./apps/api
 RUN pnpm --filter @aura/types build \
@@ -22,7 +25,11 @@ RUN pnpm --filter @aura/types build \
  && pnpm --filter @aura/shared build \
  && pnpm --filter @aura/api build
 
-# Production runtime with FFmpeg for composition/export
+# ---------- standalone production tree ----------
+FROM builder AS runtime-deps
+RUN pnpm deploy --filter=@aura/api --prod /prod/api
+
+# ---------- runner ----------
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -30,9 +37,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
  && ffmpeg -version | head -1
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/package.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages
+COPY --from=runtime-deps /prod/api ./
+COPY --from=builder /app/apps/api/drizzle ./drizzle
 EXPOSE 3001
 CMD ["node", "dist/index.js"]
