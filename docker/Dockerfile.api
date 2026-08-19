@@ -41,3 +41,6 @@ COPY --from=runtime-deps /prod/api ./
 COPY --from=builder /app/apps/api/drizzle ./drizzle
 EXPOSE 3001
 CMD ["node", "dist/index.js"]
+
+COPY docker/redis-ca.pem /etc/ssl/certs/redis-ca.pem
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/redis-ca.pem
