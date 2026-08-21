@@ -15,6 +15,7 @@ import type {
 } from '@aura/types';
 import { AuraNav } from '../components/AuraNav';
 import { api } from '../lib/api';
+import { DeveloperSettingsCard } from './settings/DeveloperSettingsCard';
 
 const DURATIONS = [15, 30, 45, 60] as const;
 const ASPECT_RATIOS: AspectRatioPreference[] = ['16:9', '9:16', '1:1', '4:5'];
@@ -357,6 +358,7 @@ export function SettingsPage() {
             </Link>
           </CardContent>
         </Card>
+        <DeveloperSettingsCard />
       </main>
     </>
   );

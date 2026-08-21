@@ -51,7 +51,7 @@ export class AgentToolRegistry {
     if (!tool) {
       throw new AppError(`Tool "${name}" is not available`, 403, 'AGENT_TOOL_FORBIDDEN');
     }
-    if (tool.confirmation && prepared === undefined) {
+    if (tool.confirmation && tool.prepare && prepared === undefined) {
       throw new AppError(
         `Tool "${name}" requires explicit confirmation before execution`,
         400,

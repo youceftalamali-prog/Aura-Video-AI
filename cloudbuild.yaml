@@ -5,8 +5,8 @@ steps:
       - '-f'
       - 'docker/Dockerfile.api'
       - '-t'
-      - 'europe-west1-docker.pkg.dev/propane-berm-phnbb/aura/aura-api:v5'
+      - 'europe-west1-docker.pkg.dev/propane-berm-phnbb/aura/aura-api:v6'
       - '.'
 
 images:
-  - 'europe-west1-docker.pkg.dev/propane-berm-phnbb/aura/aura-api:v5'
+  - 'europe-west1-docker.pkg.dev/propane-berm-phnbb/aura/aura-api:v6'

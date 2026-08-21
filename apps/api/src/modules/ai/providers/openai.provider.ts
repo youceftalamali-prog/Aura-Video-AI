@@ -97,7 +97,7 @@ ${params.schemaDescription}`;
       const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
       parsed = JSON.parse(cleaned);
     } catch {
-      throw new AppError('AI returned invalid JSON', 502, 'AI_INVALID_JSON');
+      const s0 = raw.indexOf('{'); const e0 = raw.lastIndexOf('}'); try { parsed = JSON.parse(raw.slice(s0, e0 + 1)); } catch { throw new AppError('AI returned invalid JSON', 502, 'AI_INVALID_JSON'); }
     }
 
     return params.parse(parsed);

@@ -7,8 +7,8 @@ steps:
       - "--build-arg"
       - "VITE_API_URL=https://aura-api-prod-v5nk7xhtoa-ew.a.run.app"
       - "-t"
-      - "europe-west1-docker.pkg.dev/propane-berm-phnbb/aura/aura-web:v2"
+      - "europe-west1-docker.pkg.dev/propane-berm-phnbb/aura/aura-web:v3"
       - "."
 
 images:
-  - "europe-west1-docker.pkg.dev/propane-berm-phnbb/aura/aura-web:v2"
+  - "europe-west1-docker.pkg.dev/propane-berm-phnbb/aura/aura-web:v3"
