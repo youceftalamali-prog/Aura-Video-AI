@@ -7,8 +7,6 @@ import { AuraNav } from '../components/AuraNav';
 import { WorkspaceNav } from '../components/WorkspaceNav';
 import { AgentChatPanel } from '../components/AgentChatPanel';
 import { SmartTemplatesSection } from '../components/SmartTemplatesSection';
-import { RecentVideosSection } from '../components/RecentVideosSection';
-import { RecentItemsSection } from '../components/RecentItemsSection';
 
 function greetingKey(hour: number): string {
   if (hour >= 5 && hour < 12) return 'workspace.greetingMorning';
@@ -31,7 +29,6 @@ export function DashboardPage() {
       .catch(() => setDisplayName(null));
   }, []);
 
-  // Deep links: ?template=<slug> and ?product=<id> hand the selection to the agent.
   useEffect(() => {
     if (paramHandled.current || workspace.restoring) return;
     const templateParam = searchParams.get('template');
@@ -75,7 +72,7 @@ export function DashboardPage() {
   }, [displayName, workspace.settings, t]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-b from-[#effdf6] via-[#eef8fb] to-[#f8f8f8] text-zinc-950">
       <div className="lg:hidden">
         <AuraNav />
       </div>
@@ -84,29 +81,20 @@ export function DashboardPage() {
           <WorkspaceNav />
         </div>
 
-        <main className="mx-auto w-full max-w-5xl min-w-0 flex-1 px-4 pb-16 pt-8 sm:px-6">
-          <header className="mb-6">
-            <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">{greeting}</h1>
-            <p className="mt-1 text-sm text-violet-200/80">
-              <span className="font-semibold text-fuchsia-200">Aura AI:</span> {t('workspace.whatToCreate')}
+        <main className="relative mx-auto w-full min-w-0 flex-1 px-4 pb-0 pt-6 sm:px-6 lg:max-w-none lg:px-8">
+          <header className="mx-auto mb-4 max-w-3xl text-center">
+            <h1 className="text-2xl font-black tracking-tight text-zinc-950 sm:text-3xl">{greeting}</h1>
+            <p className="mt-1 text-sm text-zinc-500">
+              <span className="font-bold text-violet-700">Aura AI:</span> {t('workspace.whatToCreate')}
             </p>
-            <p className="mt-0.5 text-xs text-violet-300/50">{t('workspace.composerHint')}</p>
-            {paramError && (
-              <p className="mt-2 text-xs text-rose-300/80">
-                {t('workspace.deepLinkError', { value: paramError })}
-              </p>
-            )}
+            {paramError && <p className="mt-2 text-xs text-rose-600">{t('workspace.deepLinkError', { value: paramError })}</p>}
           </header>
 
           <AgentChatPanel workspace={workspace} />
 
-          <SmartTemplatesSection onUseTemplate={(tpl) => void workspace.useTemplate(tpl)} />
-          <RecentVideosSection />
-          <RecentItemsSection onPickProduct={(p) => void workspace.selectProduct(p)} />
-
-          <footer className="border-t border-white/10 pt-6 text-center text-xs text-violet-300/50">
-            AURA VIDEO AI · AI Marketing Agent
-          </footer>
+          <div className="mx-auto max-w-6xl pb-72">
+            <SmartTemplatesSection onUseTemplate={(tpl) => void workspace.useTemplate(tpl)} />
+          </div>
         </main>
       </div>
     </div>
