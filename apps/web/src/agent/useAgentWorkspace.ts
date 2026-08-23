@@ -63,6 +63,38 @@ function jobKey(job: VideoGenerationJobPublic): string {
   return `${job.id}:${job.status}:${job.progress ?? ''}:${job.currentStage ?? ''}`;
 }
 
+function describeTemplateForUser(template: LibraryTemplate): string {
+  const lines = [
+    `قالب مختار: ${template.name}`,
+    template.description ? `الوصف: ${template.description}` : '',
+    `الفئة: ${template.category || 'عام'}`,
+    template.subCategory ? `الفئة الفرعية: ${template.subCategory}` : '',
+    `المقاس: ${template.aspectRatio}`,
+    `المدة: ${template.durationSeconds ?? 15} ثانية`,
+    template.tags.length > 0 ? `الكلمات/الأسلوب: ${template.tags.slice(0, 6).join(', ')}` : '',
+    template.supportedProductTypes.length > 0 ? `أنواع المنتجات المناسبة: ${template.supportedProductTypes.slice(0, 6).join(', ')}` : '',
+  ].filter(Boolean);
+
+  const scenes = template.scenes
+    .slice(0, 6)
+    .map((scene, index) => {
+      const title = scene.title || `مشهد ${index + 1}`;
+      const description = scene.description ? ` — ${scene.description}` : '';
+      return `${index + 1}. ${title}${description}`;
+    });
+
+  if (scenes.length > 0) {
+    lines.push('المشاهد المقترحة:');
+    lines.push(...scenes);
+  }
+
+  return lines.join('\n');
+}
+
+function buildTemplateSelectionPrompt(template: LibraryTemplate): string {
+  return `${describeTemplateForUser(template)}\n\nأريد استخدام هذا القالب لإنشاء إعلان احترافي. ابدأ من هنا داخل المحادثة: اطلب مني رابط المنتج أو صورة المنتج أو وصف المنتج، ثم استخدم تفاصيل هذا القالب في التحليل والسيناريو والإخراج. لا تنقلني بين الأقسام؛ قُد العملية خطوة بخطوة من داخل المحادثة.`;
+}
+
 export interface AgentWorkspaceState {
   conversationId: string | null;
   restoring: boolean;
@@ -174,9 +206,7 @@ export function useAgentWorkspace(): AgentWorkspaceState {
             });
             return changed ? next : prev;
           });
-          if (TERMINAL_JOB_STATUSES.has(job.status)) {
-            clearPoll();
-          }
+          if (TERMINAL_JOB_STATUSES.has(job.status)) clearPoll();
         } catch {
           clearPoll();
         }
@@ -197,12 +227,8 @@ export function useAgentWorkspace(): AgentWorkspaceState {
             return prev;
           });
         }
-        if (sel.selectedTemplateId) {
-          setTemplate(placeholderTemplate(sel.selectedTemplateId));
-        }
-        if (sel.activeVideoJobId && turn.toolCalls.some((tc) => tc.name === 'video.create' && tc.ok)) {
-          pollJob(sel.activeVideoJobId);
-        }
+        if (sel.selectedTemplateId) setTemplate(placeholderTemplate(sel.selectedTemplateId));
+        if (sel.activeVideoJobId && turn.toolCalls.some((tc) => tc.name === 'video.create' && tc.ok)) pollJob(sel.activeVideoJobId);
       }
     },
     [pollJob],
@@ -210,10 +236,7 @@ export function useAgentWorkspace(): AgentWorkspaceState {
 
   const ensureConversation = useCallback(async (): Promise<string> => {
     if (conversationRef.current) return conversationRef.current;
-    const created = await api.createAgentConversation({
-      title: 'Aura workspace',
-      language: i18n.resolvedLanguage ?? 'en',
-    });
+    const created = await api.createAgentConversation({ title: 'Aura workspace', language: i18n.resolvedLanguage ?? 'en' });
     conversationRef.current = created.id;
     setConversationId(created.id);
     localStorage.setItem(CONVERSATION_KEY, created.id);
@@ -230,18 +253,10 @@ export function useAgentWorkspace(): AgentWorkspaceState {
       if (opts.optimisticTemplate) setTemplate(opts.optimisticTemplate);
       try {
         const id = await ensureConversation();
-        const turn = await api.sendAgentMessage(id, {
-          content,
-          strategy,
-          modelId: modelId ?? undefined,
-        });
+        const turn = await api.sendAgentMessage(id, { content, strategy, modelId: modelId ?? undefined });
         if (opts.confirm) setConfirmation(null);
         applyTurn(turn);
-        if (turn.status === 'error') {
-          pushAssistant(turn, { errorCode: turn.errorCode });
-        } else {
-          pushAssistant(turn);
-        }
+        pushAssistant(turn, turn.status === 'error' ? { errorCode: turn.errorCode } : undefined);
       } catch (err) {
         setLastError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -341,9 +356,7 @@ export function useAgentWorkspace(): AgentWorkspaceState {
       setProduct(p);
       setProductPickerOpen(false);
       pushUser(p.name);
-      await runTurn(t('agent.useProduct', { defaultValue: 'Use the product {{name}} for creating my ad.', name: p.name }), {
-        optimisticProduct: p,
-      });
+      await runTurn(t('agent.useProduct', { defaultValue: 'Use the product {{name}} for creating my ad.', name: p.name }), { optimisticProduct: p });
     },
     [pushUser, runTurn, t],
   );
@@ -352,12 +365,12 @@ export function useAgentWorkspace(): AgentWorkspaceState {
     async (tp: LibraryTemplate) => {
       if (busyRef.current) return;
       setTemplate(tp);
-      pushUser(t('agent.useTemplateFor', { defaultValue: 'Use the template {{name}}.', name: tp.name }));
-      await runTurn(t('agent.createWithTemplate', { defaultValue: 'Create my ad using the template {{name}}.', name: tp.name }), {
-        optimisticTemplate: tp,
-      });
+      const visibleMessage = `✅ تم اختيار القالب: ${tp.name}\n${tp.description ? `${tp.description}\n` : ''}\nأرسل الآن رابط المنتج أو صورة المنتج أو وصف المنتج.`;
+      const agentPrompt = buildTemplateSelectionPrompt(tp);
+      pushUser(visibleMessage);
+      await runTurn(agentPrompt, { optimisticTemplate: tp });
     },
-    [pushUser, runTurn, t],
+    [pushUser, runTurn],
   );
 
   const value = useMemo<AgentWorkspaceState>(
@@ -388,29 +401,7 @@ export function useAgentWorkspace(): AgentWorkspaceState {
       productPickerOpen,
       lastError,
     }),
-    [
-      conversationId,
-      restoring,
-      busy,
-      messages,
-      confirmation,
-      product,
-      template,
-      products,
-      productsLoading,
-      models,
-      modelsLoading,
-      settings,
-      strategy,
-      modelId,
-      send,
-      confirmAction,
-      declineAction,
-      selectProduct,
-      useTemplate,
-      productPickerOpen,
-      lastError,
-    ],
+    [conversationId, restoring, busy, messages, confirmation, product, template, products, productsLoading, models, modelsLoading, settings, strategy, modelId, send, confirmAction, declineAction, selectProduct, useTemplate, productPickerOpen, lastError],
   );
 
   return value;
