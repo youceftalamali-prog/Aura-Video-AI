@@ -12,6 +12,7 @@ export function VideoStudioPage() {
   const { videoLanguage, contentLanguage } = useLanguage();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [productUrl, setProductUrl] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -37,6 +38,41 @@ export function VideoStudioPage() {
 
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  async function importProductFromUrl(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    setEstimate(null);
+    try {
+      const imported = await api.importProductUrl(productUrl);
+      const flow = await api.createVideoFromProduct(imported.product.id, {
+        duration: 15,
+        aspectRatio: '9:16',
+      });
+
+      setName(imported.product.name);
+      setDescription(imported.product.description || '');
+      setImageUrl(imported.product.imageUrl || imported.extracted?.images?.[0] || '');
+      setAnalysis(flow.analysis);
+      setStrategy(flow.strategy);
+      setStoryboard(flow.storyboard);
+      setAspectRatio(flow.storyboard.aspectRatio);
+      setVoiceText(flow.storyboard.scenes.map((scene) => scene.textOverlay || '').filter(Boolean).join('. '));
+
+      const project = await api.createProject({
+        name: imported.product.name,
+        description: imported.product.description || undefined,
+        productId: imported.product.id,
+      });
+      setProjectId(project.id);
+      setProductUrl('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not import this product and prepare its ad.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function analyze(e: FormEvent) {
     e.preventDefault();
@@ -153,7 +189,27 @@ export function VideoStudioPage() {
         {error && <Alert variant="error">{error}</Alert>}
 
         <Card>
-          <CardHeader><CardTitle>1. Product input</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Start from a product link</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={importProductFromUrl} className="space-y-4">
+              <Input
+                label="Product URL"
+                type="url"
+                value={productUrl}
+                onChange={(e) => setProductUrl(e.target.value)}
+                required
+                placeholder="https://your-product-page.com/..."
+              />
+              <p className="text-sm text-slate-500">
+                Import the product, prepare the ad strategy and storyboard, and create a project automatically.
+              </p>
+              <Button type="submit" loading={loading}>Import link and prepare ad</Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Or enter product details manually</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={analyze} className="space-y-4">
               <Input label={t('common.productName')} value={name} onChange={(e) => setName(e.target.value)} required />
