@@ -43,6 +43,8 @@ export interface VideoGenerationRequest {
   scriptScenes?: AdScriptScene[];
   mode?: VideoGenerationMode;
   sourceImageUrl?: string;
+  /** Optional generated narration audio URL to mix into the final render. */
+  voiceUrl?: string;
   style?: string;
   idempotencyKey?: string;
 
