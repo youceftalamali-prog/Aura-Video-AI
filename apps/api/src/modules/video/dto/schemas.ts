@@ -23,6 +23,7 @@ export const videoGenerateBodySchema = z.object({
   scriptScenes: z.array(adScriptSceneSchema).optional(),
   mode: z.enum(['text_to_video', 'image_to_video', 'storyboard']).optional(),
   sourceImageUrl: z.string().url().max(2048).optional(),
+  voiceUrl: z.string().url().max(2048).optional(),
   style: z.string().max(200).optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
 });
