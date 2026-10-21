@@ -16,6 +16,7 @@ export function VideoStudioPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [analysis, setAnalysis] = useState<ProductAnalysis | null>(null);
   const [strategy, setStrategy] = useState<CreativeStrategy | null>(null);
   const [storyboard, setStoryboard] = useState<Storyboard | null>(null);
@@ -55,9 +56,13 @@ export function VideoStudioPage() {
         tone: 'algerian-darija',
       });
 
+      const productImages = [...new Set([imported.product.imageUrl, ...(imported.extracted?.images || [])].filter((url): url is string => Boolean(url)))];
       setName(imported.product.name);
       setDescription(imported.product.description || '');
-      setImageUrl(imported.product.imageUrl || imported.extracted?.images?.[0] || '');
+      setImageUrls(productImages);
+      setImageUrl(productImages[0] || '');
+      setVoiceUrl(null);
+      setJob(null);
       setAnalysis(flow.analysis);
       setStrategy(flow.strategy);
       setStoryboard(flow.storyboard);
@@ -139,7 +144,7 @@ export function VideoStudioPage() {
           visualPrompt: s.visualPrompt,
           onScreenText: s.textOverlay,
           cameraDirection: s.cameraDirection,
-          imageUrl: imageUrl || undefined,
+          imageUrl: imageUrls.length ? (imageUrls[(s.order - 1) % imageUrls.length] || imageUrl || undefined) : (imageUrl || undefined),
         })),
         idempotencyKey: `web-${projectId}-${Date.now()}`,
       });
@@ -216,7 +221,7 @@ export function VideoStudioPage() {
                 placeholder="https://your-product-page.com/..."
               />
               <p className="text-sm text-slate-500">
-                Import the product, prepare the ad strategy and storyboard, and create a project automatically.
+                Import the product, prepare the ad strategy and storyboard, and create a project automatically. Without a paid video provider, Aura uses a low-cost image-based video with text and voiceover; AI-generated motion requires a configured video provider.
               </p>
               <Button type="submit" loading={loading}>Import link and prepare ad</Button>
             </form>
