@@ -73,7 +73,7 @@ const envSchema = z.object({
   TTS_PROVIDER: z.enum(['openai', 'none']).default('openai'),
   TTS_API_KEY: z.string().optional().default(''),
   TTS_BASE_URL: z.string().optional().default(''),
-  TTS_MODEL: z.string().default('tts-1'),
+  TTS_MODEL: z.string().default('gpt-4o-mini-tts'),
   TTS_DEFAULT_VOICE: z.string().default('alloy'),
 
   PRODUCT_ANALYSIS_CREDITS: z.coerce.number().default(0),
