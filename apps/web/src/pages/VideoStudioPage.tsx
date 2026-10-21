@@ -49,6 +49,10 @@ export function VideoStudioPage() {
       const flow = await api.createVideoFromProduct(imported.product.id, {
         duration: 15,
         aspectRatio: '9:16',
+        language: 'ar-DZ',
+        contentLanguage: 'ar-DZ',
+        videoLanguage: 'ar-DZ',
+        tone: 'algerian-darija',
       });
 
       setName(imported.product.name);
@@ -58,7 +62,7 @@ export function VideoStudioPage() {
       setStrategy(flow.strategy);
       setStoryboard(flow.storyboard);
       setAspectRatio(flow.storyboard.aspectRatio);
-      setVoiceText(flow.storyboard.scenes.map((scene) => scene.textOverlay || '').filter(Boolean).join('. '));
+      setVoiceText(flow.script.narration || flow.script.scenes.map((scene) => scene.narration).filter(Boolean).join(' '));
 
       const project = await api.createProject({
         name: imported.product.name,
@@ -112,8 +116,19 @@ export function VideoStudioPage() {
     if (!storyboard || !projectId) { setError(t('video.projectIdRequired')); return; }
     setError(null); setLoading(true); setJob(null);
     try {
-      const result = await api.generateVideo({ language: videoLanguage, contentLanguage, videoLanguage,  
+      let narrationUrl = voiceUrl;
+      if (voiceText.trim() && !narrationUrl) {
+        const voice = await api.generateVoice({
+          language: 'ar-DZ',
+          tone: 'algerian-darija',
+          text: voiceText.trim(),
+        });
+        narrationUrl = voice.url;
+        setVoiceUrl(voice.url);
+      }
+      const result = await api.generateVideo({ language: videoLanguage, contentLanguage, videoLanguage,
         projectId,
+        voiceUrl: narrationUrl || undefined,
         aspectRatio,
         duration: storyboard.duration,
         mode: imageUrl ? 'image_to_video' : 'storyboard',
