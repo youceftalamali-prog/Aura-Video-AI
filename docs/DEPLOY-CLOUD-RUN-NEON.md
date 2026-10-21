@@ -7,7 +7,7 @@ This runbook is for a **separate staging deployment** of Aura Video AI. It does 
 - API: build from `docker/Dockerfile.api` (Node 20, FFmpeg included).
 - Video worker: use the same API image, with command `node dist/worker.js`.
 - Web UI: build from `docker/Dockerfile.web`, setting build arg `VITE_API_URL` to the staging API URL.
-- Database: a dedicated Neon project/database for Aura Video AI.
+- Database: the dedicated `aura-video-ai` Neon project created for this application.
 - Redis: a separate managed Redis-compatible service is required; Neon does not replace Redis.
 - Object storage: use Cloudflare R2 (or another S3-compatible provider) for generated media. Do not rely on local container storage for production videos because Cloud Run instances are disposable.
 
@@ -18,7 +18,7 @@ This runbook is for a **separate staging deployment** of Aura Video AI. It does 
 3. Store credentials in Google Secret Manager, not in Git or image build arguments.
 4. Set all required environment variables from `.env.example` and `packages/config/src/env.ts`. At minimum:
    - `NODE_ENV=production`
-   - `PORT=8080` for Cloud Run API service (Cloud Run provides this variable; ensure the process listens on it)
+   - `PORT=8080` for the Cloud Run API service (Cloud Run provides this variable; the API reads `PORT`)
    - `DATABASE_URL` (pooled Neon URL for the long-running API/worker)
    - `REDIS_URL` and `REDIS_PREFIX=aura:staging:`
    - `JWT_SECRET` (random secret at least 32 characters)
@@ -26,7 +26,7 @@ This runbook is for a **separate staging deployment** of Aura Video AI. It does 
    - `STORAGE_PROVIDER=r2`, plus `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`, and any required public URL setting
    - AI/TTS/media provider keys only for providers that are configured and implemented
    - PayPal sandbox credentials until billing is explicitly validated
-5. Confirm the API health endpoint and worker startup/logs before routing users to staging.
+5. The API health route is `/api/v1/health`; verify it returns HTTP 200 before routing users to staging.
 
 ## Database connection and migrations
 
@@ -39,7 +39,7 @@ This runbook is for a **separate staging deployment** of Aura Video AI. It does 
   pnpm --filter @aura/api db:migrate
   ```
   Run from the repository root with the migration job's `DATABASE_URL` configured to the direct Neon URL.
-- Drizzle migration SQL files and a journal exist under `apps/api/drizzle`. Validate that every journal entry has a matching SQL file, then run migrations against staging before considering the app ready.
+- Drizzle migration SQL files `0000` through `0009` and a journal exist under `apps/api/drizzle`. The filenames match the journal entries found in the repository listing. Still run migrations against staging and verify the resulting schema before considering the app ready.
 
 ## Container build references
 
@@ -59,9 +59,11 @@ docker push REGION-docker.pkg.dev/PROJECT_ID/aura-staging/web:COMMIT_SHA
 
 Deploy the API, worker, and web as separate staging services. The worker should use the API image with command `node dist/worker.js`; do not expose it as a public HTTP service. Confirm the built web bundle uses the staging API URL before deploying.
 
+**Do not reuse the current `cloudbuild.web.yaml` unchanged:** it hardcodes the existing production API URL and production image tag.
+
 ## Staging acceptance checks
 
-- API starts and health endpoint returns HTTP 200.
+- API starts and `/api/v1/health` returns HTTP 200.
 - API connects to Neon and reports database health.
 - Redis ping succeeds.
 - Worker starts and consumes a test job.
@@ -74,5 +76,5 @@ Deploy the API, worker, and web as separate staging services. The worker should 
 
 - Select and configure a managed Redis provider.
 - Configure durable object storage and credentials.
-- Confirm the exact health endpoint and web app API base URL configuration.
+- Confirm the frontend/API URL behavior end-to-end.
 - Validate Docker builds and all migrations in a staging environment; source inspection alone does not prove a successful deployment.
