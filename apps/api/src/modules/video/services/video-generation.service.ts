@@ -18,6 +18,8 @@ import type { IMediaGenerationProvider } from '../interfaces/media-provider.inte
 import { getStorageProvider } from '../../../infrastructure/storage/index.js';
 import { CreditLedgerService } from './credit-ledger.service.js';
 import { VideoCompositionService } from './composition.service.js';
+import { StudioRenderService } from '../../studio/services/studio-render.service.js';
+import { assertSafeRemoteUrl } from '../../../infrastructure/security/url-safety.js';
 import { getRedis } from '../../../infrastructure/redis/client.js';
 
 function logEvent(event: string, payload: Record<string, unknown>): void {
@@ -30,6 +32,7 @@ const DEFAULT_LEASE_OWNER = `inline:${process.pid}`;
 export class VideoGenerationService {
   private readonly credits: CreditLedgerService;
   private readonly composer: VideoCompositionService;
+  private readonly renderer: StudioRenderService;
 
   constructor(
     private readonly db: Database,
@@ -38,6 +41,7 @@ export class VideoGenerationService {
   ) {
     this.credits = new CreditLedgerService(db);
     this.composer = new VideoCompositionService();
+    this.renderer = new StudioRenderService();
   }
 
   estimateCost(request: Pick<VideoGenerationRequest, 'duration' | 'scenes' | 'mode' | 'sourceImageUrl'>): VideoCostEstimate {
@@ -63,10 +67,11 @@ export class VideoGenerationService {
     const mode: VideoGenerationMode =
       request.mode ?? (request.sourceImageUrl ? 'image_to_video' : request.scenes.length > 1 ? 'storyboard' : 'text_to_video');
 
-    if (!this.media.isConfigured()) {
-      throw new AppError('Media provider is not configured. Set MEDIA_API_KEY.', 503, 'VIDEO_PROVIDER_NOT_CONFIGURED');
+    const canRenderLocally = mode === 'storyboard' && Boolean(request.sourceImageUrl || request.scenes.some((scene) => scene.imageUrl));
+    if (!this.media.isConfigured() && !canRenderLocally) {
+      throw new AppError('Configure a video provider, or use storyboard mode with product images for local rendering.', 503, 'VIDEO_PROVIDER_NOT_CONFIGURED');
     }
-    if (!this.media.supportsMode(mode)) {
+    if (this.media.isConfigured() && !this.media.supportsMode(mode)) {
       throw new AppError(`Provider does not support mode: ${mode}`, 400, 'INVALID_VIDEO_INPUT');
     }
 
@@ -95,7 +100,7 @@ export class VideoGenerationService {
         workspaceId: project.workspaceId,
         projectId: project.id,
         userId,
-        provider: this.media.name,
+        provider: this.media.isConfigured() ? this.media.name : 'none',
         status: 'queued',
         currentStage: 'queued',
         prompt,
@@ -108,6 +113,7 @@ export class VideoGenerationService {
           templateId: request.templateId ?? null,
           mode,
           sourceImageUrl: request.sourceImageUrl ?? null,
+          voiceUrl: request.voiceUrl ?? null,
           style: request.style ?? null,
         },
       });
@@ -156,10 +162,40 @@ export class VideoGenerationService {
       scenes: VideoGenerationRequest['scenes'];
       mode: VideoGenerationMode;
       sourceImageUrl?: string;
+      voiceUrl?: string;
       style?: string;
     };
 
     try {
+      if (!this.media.isConfigured()) {
+        await this.jobs.update(jobId, { status: 'rendering', currentStage: 'rendering', progress: 20 });
+        const downloaded: string[] = [];
+        let localResult: { localPath: string; mimeType: string } | null = null;
+        try {
+          const scenes = [];
+          for (const scene of input.scenes) {
+            const imageUrl = scene.imageUrl || input.sourceImageUrl;
+            if (!imageUrl) throw new AppError('Each storyboard scene needs a product image URL for local rendering.', 400, 'INVALID_VIDEO_INPUT');
+            const imagePath = await this.downloadRemoteAssetToTemp(imageUrl, 'image');
+            downloaded.push(imagePath);
+            scenes.push({ order: scene.order, duration: scene.duration, imagePath, onScreenText: scene.onScreenText });
+          }
+          let voicePath: string | null = null;
+          if (input.voiceUrl) {
+            voicePath = await this.downloadRemoteAssetToTemp(input.voiceUrl, 'audio');
+            downloaded.push(voicePath);
+          }
+          localResult = await this.renderer.render({ scenes, aspectRatio: input.aspectRatio, voicePath });
+          await this.jobs.update(jobId, { status: 'rendering', currentStage: 'saving_asset', progress: 85 });
+          const assetId = await this.persistLocalVideo(job, localResult.localPath, { durationSeconds: input.duration, resolution: input.aspectRatio });
+          await this.jobs.update(jobId, { status: 'completed', currentStage: 'completed', progress: 100, assetId, completedAt: new Date() });
+          logEvent('local_storyboard_completed', { jobId, assetId, scenes: scenes.length, hasVoiceover: Boolean(voicePath) });
+          return;
+        } finally {
+          for (const file of downloaded) await fs.unlink(file).catch(() => undefined);
+          if (localResult?.localPath) await fs.unlink(localResult.localPath).catch(() => undefined);
+        }
+      }
       const prompt = job.prompt || input.scenes.map((s) => s.visualPrompt).join('\n');
       const submitted = await this.media.generateVideo({
         prompt,
@@ -237,16 +273,19 @@ export class VideoGenerationService {
       const localProviderPath = await this.downloadToTemp(remoteUrl);
       await this.jobs.update(jobId, { status: 'rendering', currentStage: 'rendering', progress: 85 });
 
-      const composed = await this.composer.compose({
-        aspectRatio: input.aspectRatio,
-        outputFileName: `${jobId}.mp4`,
-        scenes: input.scenes.map((s, idx) => ({
-          order: s.order,
-          duration: s.duration,
-          videoPath: idx === 0 ? localProviderPath : undefined,
-          onScreenText: s.onScreenText,
-        })),
-      });
+      let voicePath: string | null = null;
+      let composed: { localPath: string; mimeType: string } | null = null;
+      try {
+        if (input.voiceUrl) voicePath = await this.downloadRemoteAssetToTemp(input.voiceUrl, 'audio');
+        composed = await this.renderer.render({
+          aspectRatio: input.aspectRatio,
+          scenes: [{ order: 1, duration: input.duration, videoPath: localProviderPath }],
+          voicePath,
+        });
+      } finally {
+        if (voicePath) await fs.unlink(voicePath).catch(() => undefined);
+      }
+      if (!composed) throw new AppError('Final render was not created', 500, 'VIDEO_GENERATION_FAILED');
 
       const assetId = await this.persistLocalVideo(job, composed.localPath, {
         durationSeconds: input.duration,
@@ -332,6 +371,52 @@ export class VideoGenerationService {
         referenceId: jobId,
         idempotencyKey: `video:refund:${jobId}`,
       });
+    }
+  }
+
+  private async downloadRemoteAssetToTemp(url: string, kind: 'image' | 'audio'): Promise<string> {
+    const parsed = await assertSafeRemoteUrl(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await fetch(parsed.toString(), { method: 'GET', redirect: 'manual', signal: controller.signal });
+      if (response.status >= 300 && response.status < 400) {
+        throw new AppError('Remote media redirects are blocked for security.', 400, 'REMOTE_ASSET_REDIRECT_BLOCKED');
+      }
+      if (!response.ok || !response.body) throw new AppError('Could not download media asset.', 400, 'REMOTE_ASSET_DOWNLOAD_FAILED');
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      if (kind === 'image' && !contentType.startsWith('image/')) throw new AppError('Storyboard URL did not return an image.', 400, 'INVALID_STORYBOARD_IMAGE');
+      if (kind === 'audio' && !contentType.startsWith('audio/')) throw new AppError('Voiceover URL did not return audio.', 400, 'INVALID_VOICEOVER_AUDIO');
+      const maxBytes = kind === 'image' ? 12 * 1024 * 1024 : 30 * 1024 * 1024;
+      if (Number(response.headers.get('content-length') || 0) > maxBytes) throw new AppError('Media asset is too large.', 413, 'REMOTE_ASSET_TOO_LARGE');
+      const reader = response.body.getReader();
+      const chunks: Buffer[] = [];
+      let total = 0;
+      try {
+        while (true) {
+          const part = await reader.read();
+          if (part.done) break;
+          const chunk = Buffer.from(part.value);
+          total += chunk.length;
+          if (total > maxBytes) {
+            await reader.cancel();
+            throw new AppError('Media asset is too large.', 413, 'REMOTE_ASSET_TOO_LARGE');
+          }
+          chunks.push(chunk);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      if (!total) throw new AppError('Media asset is empty.', 400, 'REMOTE_ASSET_INVALID');
+      const target = `/tmp/aura-${kind}-${randomUUID()}.${kind === 'image' ? 'img' : 'mp3'}`;
+      await fs.writeFile(target, Buffer.concat(chunks, total));
+      return target;
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      if ((err as Error).name === 'AbortError') throw new AppError('Media asset download timed out.', 408, 'REMOTE_ASSET_TIMEOUT');
+      throw new AppError('Could not download media asset.', 400, 'REMOTE_ASSET_DOWNLOAD_FAILED');
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
