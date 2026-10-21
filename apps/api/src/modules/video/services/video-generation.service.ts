@@ -17,7 +17,6 @@ import { VideoJobRepository } from './video-job.repository.js';
 import type { IMediaGenerationProvider } from '../interfaces/media-provider.interface.js';
 import { getStorageProvider } from '../../../infrastructure/storage/index.js';
 import { CreditLedgerService } from './credit-ledger.service.js';
-import { VideoCompositionService } from './composition.service.js';
 import { StudioRenderService } from '../../studio/services/studio-render.service.js';
 import { assertSafeRemoteUrl } from '../../../infrastructure/security/url-safety.js';
 import { getRedis } from '../../../infrastructure/redis/client.js';
@@ -31,7 +30,6 @@ const DEFAULT_LEASE_OWNER = `inline:${process.pid}`;
 
 export class VideoGenerationService {
   private readonly credits: CreditLedgerService;
-  private readonly composer: VideoCompositionService;
   private readonly renderer: StudioRenderService;
 
   constructor(
@@ -40,7 +38,6 @@ export class VideoGenerationService {
     private readonly media: IMediaGenerationProvider,
   ) {
     this.credits = new CreditLedgerService(db);
-    this.composer = new VideoCompositionService();
     this.renderer = new StudioRenderService();
   }
 
