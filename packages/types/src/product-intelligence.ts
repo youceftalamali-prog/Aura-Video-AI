@@ -150,6 +150,9 @@ export interface CreateVideoFromProductInput {
   platform?: string;
   tone?: string;
   aspectRatio?: '16:9' | '9:16' | '1:1' | '4:5';
+  language?: string;
+  contentLanguage?: string;
+  videoLanguage?: string;
 }
 
 export interface CreateVideoFromProductResult {
