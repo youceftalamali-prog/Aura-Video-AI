@@ -92,12 +92,12 @@ export class StudioRenderService {
 
     if (voicePath && musicPath) {
       // duck music under voice roughly
-      const filter = `[1:a]volume=1[a1];[2:a]volume=${vol}[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout]`;
+      const filter = `[1:a]volume=1,apad[a1];[2:a]volume=${vol},apad[a2];[a1][a2]amix=inputs=2:duration=longest:dropout_transition=2,apad[aout]`;
       args.push('-filter_complex', filter, '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', '-shortest', output);
     } else if (voicePath) {
-      args.push('-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-shortest', output);
+      args.push('-filter_complex', '[1:a]apad[aout]', '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', '-shortest', output);
     } else if (musicPath) {
-      args.push('-filter_complex', `[1:a]volume=${vol}[a]`, '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-shortest', output);
+      args.push('-filter_complex', `[1:a]volume=${vol},apad[a]`, '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-shortest', output);
     } else {
       await fs.copyFile(videoPath, output);
       return;

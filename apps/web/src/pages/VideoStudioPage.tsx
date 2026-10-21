@@ -12,9 +12,11 @@ export function VideoStudioPage() {
   const { videoLanguage, contentLanguage } = useLanguage();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [productUrl, setProductUrl] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [analysis, setAnalysis] = useState<ProductAnalysis | null>(null);
   const [strategy, setStrategy] = useState<CreativeStrategy | null>(null);
   const [storyboard, setStoryboard] = useState<Storyboard | null>(null);
@@ -37,6 +39,52 @@ export function VideoStudioPage() {
 
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  async function importProductFromUrl(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    setEstimate(null);
+    try {
+      const imported = await api.importProductUrl(productUrl);
+      const productImages = [...new Set([imported.product.imageUrl, ...(imported.extracted?.images || [])].filter((url): url is string => Boolean(url)))];
+      if (!productImages.length) {
+        throw new Error('No product image was found at this URL. Add a product image before creating the video.');
+      }
+      const flow = await api.createVideoFromProduct(imported.product.id, {
+        duration: 15,
+        aspectRatio: '9:16',
+        language: 'ar-DZ',
+        contentLanguage: 'ar-DZ',
+        videoLanguage: 'ar-DZ',
+        tone: 'algerian-darija',
+      });
+
+      setName(imported.product.name);
+      setDescription(imported.product.description || '');
+      setImageUrls(productImages);
+      setImageUrl(productImages[0] || '');
+      setVoiceUrl(null);
+      setJob(null);
+      setAnalysis(flow.analysis);
+      setStrategy(flow.strategy);
+      setStoryboard(flow.storyboard);
+      setAspectRatio(flow.storyboard.aspectRatio);
+      setVoiceText(flow.script.narration || flow.script.scenes.map((scene) => scene.narration).filter(Boolean).join(' '));
+
+      const project = await api.createProject({
+        name: imported.product.name,
+        description: imported.product.description || undefined,
+        productId: imported.product.id,
+      });
+      setProjectId(project.id);
+      setProductUrl('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not import this product and prepare its ad.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function analyze(e: FormEvent) {
     e.preventDefault();
@@ -76,8 +124,19 @@ export function VideoStudioPage() {
     if (!storyboard || !projectId) { setError(t('video.projectIdRequired')); return; }
     setError(null); setLoading(true); setJob(null);
     try {
-      const result = await api.generateVideo({ language: videoLanguage, contentLanguage, videoLanguage,  
+      let narrationUrl = voiceUrl;
+      if (voiceText.trim() && !narrationUrl) {
+        const voice = await api.generateVoice({
+          language: 'ar-DZ',
+          tone: 'algerian-darija',
+          text: voiceText.trim(),
+        });
+        narrationUrl = voice.url;
+        setVoiceUrl(voice.url);
+      }
+      const result = await api.generateVideo({ language: videoLanguage, contentLanguage, videoLanguage,
         projectId,
+        voiceUrl: narrationUrl || undefined,
         aspectRatio,
         duration: storyboard.duration,
         mode: imageUrl ? 'image_to_video' : 'storyboard',
@@ -88,7 +147,7 @@ export function VideoStudioPage() {
           visualPrompt: s.visualPrompt,
           onScreenText: s.textOverlay,
           cameraDirection: s.cameraDirection,
-          imageUrl: imageUrl || undefined,
+          imageUrl: imageUrls.length ? (imageUrls[(s.order - 1) % imageUrls.length] || imageUrl || undefined) : (imageUrl || undefined),
         })),
         idempotencyKey: `web-${projectId}-${Date.now()}`,
       });
@@ -153,7 +212,27 @@ export function VideoStudioPage() {
         {error && <Alert variant="error">{error}</Alert>}
 
         <Card>
-          <CardHeader><CardTitle>1. Product input</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Start from a product link</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={importProductFromUrl} className="space-y-4">
+              <Input
+                label="Product URL"
+                type="url"
+                value={productUrl}
+                onChange={(e) => setProductUrl(e.target.value)}
+                required
+                placeholder="https://your-product-page.com/..."
+              />
+              <p className="text-sm text-slate-500">
+                Import the product, prepare the ad strategy and storyboard, and create a project automatically. Without a paid video provider, Aura uses a low-cost image-based video with text and voiceover; AI-generated motion requires a configured video provider.
+              </p>
+              <Button type="submit" loading={loading}>Import link and prepare ad</Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Or enter product details manually</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={analyze} className="space-y-4">
               <Input label={t('common.productName')} value={name} onChange={(e) => setName(e.target.value)} required />
