@@ -44,10 +44,13 @@ export class VideoGenerationService {
   estimateCost(request: Pick<VideoGenerationRequest, 'duration' | 'scenes' | 'mode' | 'sourceImageUrl'>): VideoCostEstimate {
     const mode: VideoGenerationMode =
       request.mode ?? (request.sourceImageUrl ? 'image_to_video' : request.scenes.length > 1 ? 'storyboard' : 'text_to_video');
+    const canRenderLocally = ['storyboard', 'image_to_video'].includes(mode) &&
+      Boolean(request.sourceImageUrl || request.scenes.some((scene) => scene.imageUrl)) &&
+      !this.media.isConfigured();
     return this.credits.estimateCost({
       duration: request.duration,
       sceneCount: request.scenes.length,
-      mode,
+      mode: canRenderLocally ? 'storyboard' : mode,
     });
   }
 
@@ -79,7 +82,7 @@ export class VideoGenerationService {
       }
     }
 
-    const estimate = this.credits.estimateCost({ duration: request.duration, sceneCount: request.scenes.length, mode });
+    const estimate = this.credits.estimateCost({ duration: request.duration, sceneCount: request.scenes.length, mode: canRenderLocally ? 'storyboard' : mode });
     const chargeReference = request.idempotencyKey ? `request:${request.idempotencyKey}` : randomUUID();
     const chargeIdempotencyKey = `video:charge:${project.workspaceId}:${chargeReference}`;
     await this.credits.deduct(project.workspaceId, estimate.credits, {
