@@ -47,6 +47,10 @@ export function VideoStudioPage() {
     setEstimate(null);
     try {
       const imported = await api.importProductUrl(productUrl);
+      const productImages = [...new Set([imported.product.imageUrl, ...(imported.extracted?.images || [])].filter((url): url is string => Boolean(url)))];
+      if (!productImages.length) {
+        throw new Error('No product image was found at this URL. Add a product image before creating the video.');
+      }
       const flow = await api.createVideoFromProduct(imported.product.id, {
         duration: 15,
         aspectRatio: '9:16',
@@ -56,7 +60,6 @@ export function VideoStudioPage() {
         tone: 'algerian-darija',
       });
 
-      const productImages = [...new Set([imported.product.imageUrl, ...(imported.extracted?.images || [])].filter((url): url is string => Boolean(url)))];
       setName(imported.product.name);
       setDescription(imported.product.description || '');
       setImageUrls(productImages);
