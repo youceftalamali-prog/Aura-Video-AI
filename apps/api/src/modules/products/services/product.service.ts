@@ -264,6 +264,7 @@ export class ProductService {
       language: input.language,
       contentLanguage: input.contentLanguage,
       videoLanguage: input.videoLanguage,
+      aiOutputLanguage: input.videoLanguage || input.language,
     });
 
     const allTemplates = await this.templates.listActive();
