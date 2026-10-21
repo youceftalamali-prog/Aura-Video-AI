@@ -37,6 +37,14 @@ export class OpenAITTSProvider implements ITextToSpeechProvider {
     }
 
     const env = getEnv();
+    const model = env.TTS_MODEL || 'tts-1';
+    const isAlgerianDarija = request.language?.toLowerCase() === 'ar-dz' || request.tone?.toLowerCase() === 'algerian-darija';
+    const supportsInstructions = model.startsWith('gpt-4o-mini-tts');
+    const instructions = isAlgerianDarija
+      ? 'Speak naturally in Algerian Arabic (Darija), as a native Algerian speaker. Use everyday Algerian pronunciation and phrasing, not Modern Standard Arabic. Deliver this as a warm, clear, persuasive product advertisement. Do not translate or paraphrase the supplied text.'
+      : request.tone
+        ? `Speak in a ${request.tone} tone.`
+        : undefined;
     const response = await fetch(`${this.baseUrl}/audio/speech`, {
       method: 'POST',
       headers: {
@@ -44,11 +52,12 @@ export class OpenAITTSProvider implements ITextToSpeechProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: env.TTS_MODEL || 'tts-1',
+        model,
         input: request.text,
         voice: request.voice || env.TTS_DEFAULT_VOICE || 'alloy',
         speed: request.speed ?? 1.0,
         response_format: 'mp3',
+        ...(supportsInstructions && instructions ? { instructions } : {}),
       }),
     });
 
