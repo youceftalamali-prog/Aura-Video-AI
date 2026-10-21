@@ -222,12 +222,17 @@ export class ProductService {
       intel.marketingAngles[0] ||
       null;
 
+    const requestedLanguage = input.videoLanguage || input.language || 'en';
+    const dialectInstruction = requestedLanguage.toLowerCase() === 'ar-dz'
+      ? 'Write the ad voiceover in natural Algerian Arabic (Darija), with everyday Algerian expressions and pronunciation. Avoid Modern Standard Arabic.'
+      : '';
     const userRequest = [
       angle ? `Marketing angle: ${angle.title} — ${angle.description}` : '',
       input.hookText ? `Use hook: ${input.hookText}` : '',
       input.platform ? `Platform: ${input.platform}` : '',
       input.tone ? `Tone: ${input.tone}` : '',
       input.duration ? `Duration: ${input.duration}s` : '',
+      dialectInstruction,
     ]
       .filter(Boolean)
       .join('\n');
@@ -239,17 +244,26 @@ export class ProductService {
       userRequest: userRequest || undefined,
       preferredDuration: input.duration,
       preferredAspectRatio: input.aspectRatio,
+      language: input.language,
+      contentLanguage: input.contentLanguage,
+      videoLanguage: input.videoLanguage,
     });
 
     const script = await this.script.generate({
       productAnalysis: analysis,
       creativeStrategy: strategy,
+      language: input.language,
+      contentLanguage: input.contentLanguage,
+      videoLanguage: input.videoLanguage,
     });
 
     const storyboard = await this.storyboard.generate({
       adScript: script,
       creativeStrategy: strategy,
       aspectRatio: input.aspectRatio || strategy.suggestedAspectRatio,
+      language: input.language,
+      contentLanguage: input.contentLanguage,
+      videoLanguage: input.videoLanguage,
     });
 
     const allTemplates = await this.templates.listActive();
