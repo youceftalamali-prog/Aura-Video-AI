@@ -64,7 +64,7 @@ export class VideoGenerationService {
     const mode: VideoGenerationMode =
       request.mode ?? (request.sourceImageUrl ? 'image_to_video' : request.scenes.length > 1 ? 'storyboard' : 'text_to_video');
 
-    const canRenderLocally = mode === 'storyboard' && Boolean(request.sourceImageUrl || request.scenes.some((scene) => scene.imageUrl));
+    const canRenderLocally = ['storyboard', 'image_to_video'].includes(mode) && Boolean(request.sourceImageUrl || request.scenes.some((scene) => scene.imageUrl));
     if (!this.media.isConfigured() && !canRenderLocally) {
       throw new AppError('Configure a video provider, or use storyboard mode with product images for local rendering.', 503, 'VIDEO_PROVIDER_NOT_CONFIGURED');
     }
