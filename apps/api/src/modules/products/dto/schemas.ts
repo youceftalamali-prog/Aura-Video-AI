@@ -49,4 +49,7 @@ export const createVideoFromProductSchema = z.object({
   platform: z.string().max(40).optional(),
   tone: z.string().max(40).optional(),
   aspectRatio: z.enum(['16:9', '9:16', '1:1', '4:5']).optional(),
+  language: z.string().max(20).optional(),
+  contentLanguage: z.string().max(20).optional(),
+  videoLanguage: z.string().max(20).optional(),
 });
